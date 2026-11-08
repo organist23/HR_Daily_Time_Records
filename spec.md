@@ -26,7 +26,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Day undertime** = sum of both sessions, shown in the Hours and Minutes columns.
 - **Credited minutes** for a session with both punches = session length − late − early (minimum 0). This means time outside official hours is never credited.
 - **Days total** = floor(total credited minutes ÷ 480). It is printed in the Total row as `<n> days`. This matches the reference photo: 100h03m ÷ 8 = 12.5 → "12 days". The undertime total goes in the Total row's Undertime columns.
-- **Holidays and weekends** with no time entries: the label goes across the time cells, with 0 credit and no undertime. If the day has time entries (e.g. work from home), the times are shown and credited instead of the label.
+- **Holidays and weekends** with no time entries: the label goes across the time cells, with 0 credit and no undertime. If the day has time entries (e.g. work from home), the times are shown and credited instead of the label, and undertime is never charged on these days (not a workday). Added 2026-11-08 from the Phase 2 review.
 
 ## User Stories
 

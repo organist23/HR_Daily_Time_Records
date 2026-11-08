@@ -48,10 +48,26 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 /* Print and PDF: only DTR pages. An office batch replaces the on-screen page. */
 @media print {
   body, .app, .body, .preview { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; }
-  .topbar, .results, .sidebar, .controls, .backdrop, .preview > p { display: none !important; }
+  .topbar, .results, .sidebar, .controls, .backdrop, .empty-hint, .holidays { display: none !important; }
   .print-batch { display: block; }
-  .preview:has(.print-batch) > .page { display: none; }
+  .preview:has(.print-batch) .main-page { display: none; }
 }
+.top-actions { display: flex; gap: 8px; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+.actions .spacer { flex: 1; }
+.holidays { max-width: 8.27in; margin: 0 auto; }
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: var(--panel); padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.calendar .weekday { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.calendar .day { min-height: 72px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 6px; text-align: left; border-radius: 6px; }
+.calendar .day.weekend { background: var(--bg); }
+.calendar .day.has-holiday { background: var(--accent-soft); border-color: var(--accent); }
+.calendar .num { font-weight: 600; }
+.calendar .hname { font-size: 12px; }
+.calendar .htype { font-size: 11px; color: var(--muted); }
+.holiday-list { margin-top: 16px; }
+.holiday-list h2 { font-size: 14px; margin: 0 0 8px; }
+.holiday-list ul { list-style: none; margin: 0; padding: 0; }
+.holiday-list li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }

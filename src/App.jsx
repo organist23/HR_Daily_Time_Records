@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
+import HolidaysView from './HolidaysView.jsx';
 import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 
+const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
 // Electron prefixes errors thrown in main; show only the message.
@@ -30,7 +32,8 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
 
   const graceMinutes = settings.graceMinutes ?? 15;
-  const result = computeDtr({ punches, year, month, half, graceMinutes });
+  const holidays = data.holidays ?? NO_HOLIDAYS;
+  const result = computeDtr({ punches, year, month, half, graceMinutes, holidays });
   const periodText = periodLabel(year, month, half);
   const periodShort = periodText.replace(/^For the (month|period) of /, '');
   const closeSettings = useCallback(() => setEditing(false), []);
@@ -98,9 +101,9 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
         const p = byEmployee.get(e.acNo) ?? [];
-        return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes }) };
+        return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes, holidays }) };
       });
-  }, [batch, data, employee.office, year, month, half, graceMinutes]);
+  }, [batch, data, employee.office, year, month, half, graceMinutes, holidays]);
 
   return (
     <>
@@ -143,7 +146,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
           {working && <span className="muted">Working…</span>}
         </div>
       </div>
-      <div className="page">
+      <div className="page main-page">
         <DtrForm name={employee.name} periodText={periodText}
           officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge} />
       </div>
@@ -171,6 +174,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
+  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
@@ -195,6 +199,15 @@ export default function App() {
 
   const cancel = useCallback(() => setPending(null), []);
 
+  // Holiday changes go through main; errors come back as plain messages for the dialog.
+  const holidayCall = async (call) => {
+    try {
+      setData(await call());
+    } catch (e) {
+      throw new Error(ipcError(e));
+    }
+  };
+
   const runImport = async (items) => {
     setPending(null);
     setBusy(true);
@@ -218,9 +231,14 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1>Employees DTR Analyzer</h1>
-        <button className="primary" onClick={pick} disabled={busy || !data}>
-          {busy ? 'Importing…' : 'Import Excel'}
-        </button>
+        <div className="top-actions">
+          <button onClick={() => setView(view === 'dtr' ? 'holidays' : 'dtr')} disabled={!data}>
+            {view === 'dtr' ? 'Holidays' : 'DTR preview'}
+          </button>
+          <button className="primary" onClick={pick} disabled={busy || !data}>
+            {busy ? 'Importing…' : 'Import Excel'}
+          </button>
+        </div>
       </header>
 
       {messages && (
@@ -247,7 +265,10 @@ export default function App() {
                     <button
                       className={selected === e.key ? 'emp active' : 'emp'}
                       aria-pressed={selected === e.key}
-                      onClick={() => setSelected(e.key)}
+                      onClick={() => {
+                        setSelected(e.key);
+                        setView('dtr');
+                      }}
                     >
                       <span>{e.name}</span>
                       <span className="muted">#{e.acNo}</span>
@@ -259,11 +280,21 @@ export default function App() {
           ))}
         </nav>
         <main className="preview">
-          {employee ? (
-            <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
-          ) : (
-            <p className="muted">Select an employee to preview their DTR.</p>
+          {view === 'holidays' && data && (
+            <HolidaysView
+              holidays={data.holidays ?? NO_HOLIDAYS}
+              onSave={(h, originalDate) => holidayCall(() => window.api.saveHoliday(h, originalDate))}
+              onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
+            />
           )}
+          {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
+          <div hidden={view !== 'dtr'}>
+            {employee ? (
+              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
+            ) : (
+              <p className="muted empty-hint">Select an employee to preview their DTR.</p>
+            )}
+          </div>
         </main>
       </div>
 

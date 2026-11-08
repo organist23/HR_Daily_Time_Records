@@ -11,7 +11,7 @@ const july = (acNo, half = 'first', graceMinutes = 15) =>
 describe('computeDtr', () => {
   it('missing punch = 4h undertime, absent session = blank', () => {
     const r = july('568').rows[0]; // RONIE 7/01: AM 08:00 in only, PM absent
-    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240 });
+    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240, label: '' });
   });
 
   it('late beyond grace counts from on-duty', () => {
@@ -58,7 +58,7 @@ describe('computeDtr', () => {
   it('days outside the period are blank', () => {
     const d = july('14', 'second');
     expect(d.rows).toHaveLength(31);
-    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0 });
+    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '' });
     expect(d.credited).toBe(0);
   });
 
@@ -103,5 +103,62 @@ describe('officialHours', () => {
 
   it('is empty with no punches', () => {
     expect(officialHours([], 2026, 7)).toBe('');
+  });
+});
+
+describe('holiday and weekend labels', () => {
+  const holidays = { '2026-07-03': { date: '2026-07-03', name: 'Test Holiday', type: 'Regular Holiday' } };
+  const withHolidays = (acNo, half = 'first', h = holidays) =>
+    computeDtr({ punches: of(acNo), year: 2026, month: 7, half, graceMinutes: 15, holidays: h });
+
+  it('labels Saturday and Sunday rows without times (July 4 and 5, 2026)', () => {
+    const d = july('14');
+    expect(d.rows[3].label).toBe('SATURDAY');
+    expect(d.rows[4].label).toBe('SUNDAY');
+    expect(d.rows[2].label).toBe('');
+    expect(d.credited).toBe(3120);
+  });
+
+  it('labels a holiday on an absent day with 0 undertime', () => {
+    const r = withHolidays('783').rows[2]; // MARY ANN EGTAPEN 7/03: both sessions absent
+    expect(r).toMatchObject({ label: 'REGULAR HOLIDAY', amIn: '', pmOut: '', undertime: 0 });
+  });
+
+  it('keeps times on a holiday with time entries', () => {
+    const r = withHolidays('14').rows[2]; // RELITA 7/03 has punches
+    expect(r.label).toBe('');
+    expect(r.pmOut).toBe('5:00');
+  });
+
+  it('shows times on a weekend with a punch', () => {
+    const punches = [{ acNo: '1', name: 'X', date: '2026-07-04', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:00', out: '12:00' }];
+    const r = computeDtr({ punches, year: 2026, month: 7, half: 'full', graceMinutes: 15 }).rows[3];
+    expect(r).toMatchObject({ label: '', amIn: '8:00' });
+  });
+
+  it('no undertime on a holiday or weekend, but worked time still counts', () => {
+    const sat = { acNo: '1', name: 'X', date: '2026-07-04', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:00', out: '' };
+    const hol = { acNo: '1', name: 'X', date: '2026-07-03', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '09:00', out: '12:00' };
+    const d = computeDtr({ punches: [sat, hol], year: 2026, month: 7, half: 'full', graceMinutes: 15, holidays });
+    expect(d.rows[3].undertime).toBe(0); // Saturday, departure missing
+    expect(d.rows[2].undertime).toBe(0); // holiday, 1h late
+    expect(d.credited).toBe(180); // 9:00-12:00 on the holiday
+  });
+
+  it('a malformed holiday entry still labels instead of crashing', () => {
+    const bad = { '2026-07-03': { date: '2026-07-03', name: 'X' } };
+    expect(withHolidays('783', 'first', bad).rows[2].label).toBe('HOLIDAY');
+  });
+
+  it('a holiday on a weekend shows the holiday', () => {
+    const h = { '2026-07-04': { date: '2026-07-04', name: 'X', type: 'Local Holiday' } };
+    expect(withHolidays('14', 'first', h).rows[3].label).toBe('LOCAL HOLIDAY');
+  });
+
+  it('no labels outside the period or the month', () => {
+    expect(withHolidays('14', 'second').rows[3].label).toBe(''); // July 4 is in 1-15
+    const sept = computeDtr({ punches: [], year: 2026, month: 9, half: 'full', graceMinutes: 15 });
+    expect(sept.rows[30].label).toBe(''); // no September 31
+    expect(sept.rows[4].label).toBe('SATURDAY'); // September 5, 2026
   });
 });

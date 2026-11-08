@@ -54,6 +54,7 @@
 .dtr-form .grid tr.sub th { font-size: 8pt; line-height: 1.1; }
 .dtr-form .grid .sep { border-right-width: 2px; }
 .dtr-form .grid tbody td { height: 1.5em; }
+.dtr-form .grid .label-cell { font-weight: bold; letter-spacing: 0.15em; font-size: 9pt; }
 .dtr-form .grid .total-line { display: flex; justify-content: space-between; align-items: center; padding: 0 4pt; font-size: 9pt; }
 .dtr-form .grid .total-line .days { font-weight: bold; font-size: 10pt; }
 

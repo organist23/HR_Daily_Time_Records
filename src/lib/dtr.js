@@ -1,8 +1,10 @@
+export const HOLIDAY_TYPES = ['Regular Holiday', 'Special Non-Working Holiday', 'Local Holiday', 'Work Suspension'];
+
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'];
 
 const minutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
-const daysIn = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+export const daysIn = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 export function formatTime(hhmm) {
   if (!hhmm) return '';
@@ -35,7 +37,7 @@ function session(p, graceMinutes) {
   return { undertime, credited: length - undertime };
 }
 
-export function computeDtr({ punches, year, month, half, graceMinutes }) {
+export function computeDtr({ punches, year, month, half, graceMinutes, holidays = {} }) {
   const [from, to] = periodRange(year, month, half);
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
   const byKey = new Map(punches.map((p) => [`${p.date}|${p.session}`, p]));
@@ -44,7 +46,7 @@ export function computeDtr({ punches, year, month, half, graceMinutes }) {
   let credited = 0;
   const rows = [];
   for (let day = 1; day <= 31; day++) {
-    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0 };
+    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '' };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
       const am = byKey.get(`${date}|AM`);
@@ -53,11 +55,17 @@ export function computeDtr({ punches, year, month, half, graceMinutes }) {
         amIn: formatTime(am?.in), amOut: formatTime(am?.out),
         pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
       });
+      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+      const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;
+      const offLabel = holiday ? String(holiday.type || 'Holiday').toUpperCase()
+        : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
       for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
-        row.undertime += s.undertime;
+        if (!offLabel) row.undertime += s.undertime; // not a workday: no undertime, worked time still counts
         credited += s.credited;
       }
       totalUndertime += row.undertime;
+      // The label shows only when the day has no times, so work on those days stays visible.
+      if (!row.amIn && !row.amOut && !row.pmIn && !row.pmOut) row.label = offLabel;
     }
     rows.push(row);
   }

@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday } from '../src/lib/store.js';
+import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const made = [];
@@ -131,5 +132,67 @@ describe('updateOffice', () => {
   it('rejects an unknown office, including inherited names', () => {
     expect(() => updateOffice(withHrmo(), 'Accounting', { inCharge: '', graceMinutes: 15 })).toThrow(/Unknown office/);
     expect(() => updateOffice(withHrmo(), 'constructor', { inCharge: '', graceMinutes: 15 })).toThrow(/Unknown office/);
+  });
+});
+
+describe('holidays', () => {
+  const reg = { date: '2026-07-03', name: ' Test Holiday ', type: 'Regular Holiday' };
+
+  it('lists the four types', () => {
+    expect(HOLIDAY_TYPES).toEqual(['Regular Holiday', 'Special Non-Working Holiday', 'Local Holiday', 'Work Suspension']);
+  });
+
+  it('adds to data without a holidays map (older files)', () => {
+    const data = emptyData();
+    delete data.holidays;
+    setHoliday(data, reg);
+    expect(data.holidays).toEqual({ '2026-07-03': { date: '2026-07-03', name: 'Test Holiday', type: 'Regular Holiday' } });
+  });
+
+  it('rejects a second holiday on the same date', () => {
+    const data = emptyData();
+    setHoliday(data, reg);
+    expect(() => setHoliday(data, { ...reg, name: 'Other' })).toThrow('A holiday already exists on 2026-07-03');
+    expect(data.holidays['2026-07-03'].name).toBe('Test Holiday');
+  });
+
+  it('edits in place and moves to a new date', () => {
+    const data = emptyData();
+    setHoliday(data, reg);
+    setHoliday(data, { ...reg, type: 'Local Holiday' }, '2026-07-03');
+    expect(data.holidays['2026-07-03'].type).toBe('Local Holiday');
+    setHoliday(data, { ...reg, date: '2026-07-06' }, '2026-07-03');
+    expect(Object.keys(data.holidays)).toEqual(['2026-07-06']);
+  });
+
+  it('rejects moving onto another holiday and leaves both unchanged', () => {
+    const data = emptyData();
+    setHoliday(data, reg);
+    setHoliday(data, { ...reg, date: '2026-07-06', name: 'B' });
+    expect(() => setHoliday(data, { ...reg, date: '2026-07-06' }, '2026-07-03')).toThrow(/already exists on 2026-07-06/);
+    expect(Object.keys(data.holidays).sort()).toEqual(['2026-07-03', '2026-07-06']);
+  });
+
+  it.each([
+    [{ ...reg, date: '2026-02-30' }, /Invalid date/],
+    [{ ...reg, date: '7/03/2026' }, /Invalid date/],
+    [{ ...reg, name: '   ' }, /name/i],
+    [{ ...reg, name: 'A'.repeat(101) }, /name/i],
+    [{ ...reg, type: 'Birthday' }, /type/i],
+  ])('rejects invalid input %#', (h, err) => {
+    const data = emptyData();
+    expect(() => setHoliday(data, h)).toThrow(err);
+    expect(data.holidays).toEqual({});
+  });
+
+  it('rejects deleting a date with no holiday', () => {
+    expect(() => deleteHoliday(emptyData(), '2026-07-03')).toThrow('No holiday on 2026-07-03');
+  });
+
+  it('deletes', () => {
+    const data = emptyData();
+    setHoliday(data, reg);
+    deleteHoliday(data, '2026-07-03');
+    expect(data.holidays).toEqual({});
   });
 });
