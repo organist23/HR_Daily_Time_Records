@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,7 +6,13 @@ import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice } from '../src/lib/store.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
-const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-'));
+const made = [];
+const tmpDir = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-'));
+  made.push(dir);
+  return dir;
+};
+afterAll(() => made.forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
 
 describe('mergeImport', () => {
   it('adds then updates without duplicates', () => {

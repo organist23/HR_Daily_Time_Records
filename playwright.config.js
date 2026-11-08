@@ -4,4 +4,5 @@ export default defineConfig({
   testDir: 'test/e2e',
   timeout: 60000,
   workers: 1,
+  globalTeardown: './test/e2e/global-teardown.js',
 });
