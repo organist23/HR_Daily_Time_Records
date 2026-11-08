@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay } from '../src/lib/store.js';
 import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
@@ -194,5 +194,99 @@ describe('holidays', () => {
     setHoliday(data, reg);
     deleteHoliday(data, '2026-07-03');
     expect(data.holidays).toEqual({});
+  });
+});
+
+describe('time adjustments', () => {
+  const AT = '2026-11-09T02:00:00.000Z';
+  const ronie = () => {
+    const data = emptyData();
+    mergeImport(data, 'HRMO', hrmo());
+    return data;
+  };
+  // RONIE (568) 7/01 device: AM 08:00 in only, PM absent.
+  const wfh = {
+    office: 'HRMO', acNo: '568', date: '2026-07-01',
+    am: { in: '08:00', out: '12:00' }, pm: { in: '13:00', out: '17:00' }, reason: ' Work from home ',
+  };
+
+  it('stores changed sessions and keeps the device punch', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    expect(data.adjustments['HRMO|568|2026-07-01|AM']).toEqual({ in: '08:00', out: '12:00', onDuty: '08:00', offDuty: '12:00', reason: 'Work from home', at: AT });
+    expect(data.adjustments['HRMO|568|2026-07-01|PM']).toEqual({ in: '13:00', out: '17:00', onDuty: '13:00', offDuty: '17:00', reason: 'Work from home', at: AT });
+    expect(data.punches['HRMO|568|2026-07-01|AM']).toMatchObject({ in: '08:00', out: '' });
+  });
+
+  it('stores nothing when values equal the device, and removes an existing adjustment', () => {
+    const data = ronie();
+    const same = { ...wfh, am: { in: '08:00', out: '' }, pm: { in: '', out: '' }, reason: '' };
+    adjustDay(data, same, AT);
+    expect(data.adjustments ?? {}).toEqual({});
+    adjustDay(data, wfh, AT);
+    adjustDay(data, { ...same, am: { in: '08:00', out: '12:00' }, reason: 'fix' }, AT); // PM back to device
+    expect(Object.keys(data.adjustments)).toEqual(['HRMO|568|2026-07-01|AM']);
+  });
+
+  it.each([
+    [{ am: { in: '25:00', out: '12:00' } }, /Invalid time: 25:00/],
+    [{ am: { in: '8:00', out: '12:00' } }, /Invalid time: 8:00/],
+    [{ am: { in: '12:00', out: '08:00' } }, /A.M. departure must be later than arrival/],
+    [{ pm: { in: '13:00', out: '13:00' } }, /P.M. departure must be later than arrival/],
+    [{ reason: '  ' }, /Reason is required/],
+    [{ date: '2026-02-30' }, /Invalid date/],
+    [{ acNo: '999' }, /Unknown employee/],
+  ])('rejects bad input %#', (patch, err) => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, ...patch }, AT)).toThrow(err);
+    expect(data.adjustments ?? {}).toEqual({});
+  });
+
+  it('keeps the reason and time of a session that was not changed', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    const later = '2026-11-10T02:00:00.000Z';
+    adjustDay(data, { ...wfh, pm: { in: '13:00', out: '16:00' }, reason: 'Left early, approved' }, later);
+    expect(data.adjustments['HRMO|568|2026-07-01|AM']).toMatchObject({ reason: 'Work from home', at: AT });
+    expect(data.adjustments['HRMO|568|2026-07-01|PM']).toMatchObject({ out: '16:00', reason: 'Left early, approved', at: later });
+  });
+
+  it('rejects an A.M. departure later than the P.M. arrival', () => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, am: { in: '08:00', out: '14:00' } }, AT)).toThrow('A.M. departure must not be later than P.M. arrival');
+  });
+
+  it('rejects non-string times', () => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, am: { in: ['08:00'], out: '12:00' } }, AT)).toThrow(/Invalid time/);
+  });
+
+  it('uses the nearest dated punch for official hours', () => {
+    const data = emptyData();
+    const p = (date, onDuty, offDuty) => ({ acNo: '1', name: 'X', date, session: 'AM', onDuty, offDuty, in: onDuty, out: offDuty });
+    mergeImport(data, 'HR', [p('2026-01-05', '07:30', '11:30'), p('2026-07-06', '08:00', '12:00')]);
+    adjustDay(data, { office: 'HR', acNo: '1', date: '2026-07-13', am: { in: '08:00', out: '12:00' }, pm: {}, reason: 'WFH' }, AT);
+    expect(data.adjustments['HR|1|2026-07-13|AM']).toMatchObject({ onDuty: '08:00', offDuty: '12:00' });
+  });
+
+  it('takes official hours from other punches for a day with no device rows', () => {
+    const data = ronie();
+    adjustDay(data, { ...wfh, date: '2026-07-13' }, AT);
+    expect(data.adjustments['HRMO|568|2026-07-13|PM']).toMatchObject({ onDuty: '13:00', offDuty: '17:00' });
+  });
+
+  it('survives a re-import', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    mergeImport(data, 'HRMO', hrmo());
+    expect(Object.keys(data.adjustments)).toHaveLength(2);
+  });
+
+  it('reverts a day, and refuses when nothing is adjusted', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    revertDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01' });
+    expect(data.adjustments).toEqual({});
+    expect(() => revertDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01' })).toThrow('No adjustment on 2026-07-01');
   });
 });

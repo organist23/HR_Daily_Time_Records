@@ -3,7 +3,8 @@ import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
 import HolidaysView from './HolidaysView.jsx';
-import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
+import AdjustDialog from './AdjustDialog.jsx';
+import { MONTHS, computeDtr, daysIn, effectivePunches, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
@@ -16,10 +17,18 @@ const punchesOf = (data, emp) => {
   return Object.entries(data.punches).filter(([k]) => k.startsWith(prefix)).map(([, p]) => p);
 };
 
-function Preview({ data, employee, onDataChange, onNotice }) {
-  const punches = useMemo(() => punchesOf(data, employee), [data, employee]);
+const NO_ADJUSTMENTS = {};
 
-  const latest = punches.reduce((max, p) => (p.date > max ? p.date : max), '');
+function Preview({ data, employee, onDataChange, onNotice }) {
+  const device = useMemo(() => punchesOf(data, employee), [data, employee]);
+  const adjustments = data.adjustments ?? NO_ADJUSTMENTS;
+  // Everything shown or printed uses device punches with the admin's adjustments applied.
+  const punches = useMemo(
+    () => effectivePunches(device, adjustments, employee.office, employee.acNo),
+    [device, adjustments, employee],
+  );
+
+  const latest = device.reduce((max, p) => (p.date > max ? p.date : max), ''); // last imported date, not an adjustment
   const today = new Date();
   const [year, setYear] = useState(latest ? Number(latest.slice(0, 4)) : today.getFullYear());
   const [yearText, setYearText] = useState(String(year)); // year applies only once 4 digits are typed
@@ -30,6 +39,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const [editing, setEditing] = useState(false);
   const [working, setWorking] = useState(false);
   const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
+  const [adjusting, setAdjusting] = useState(null); // day of month being adjusted
 
   const graceMinutes = settings.graceMinutes ?? 15;
   const holidays = data.holidays ?? NO_HOLIDAYS;
@@ -37,6 +47,33 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const periodText = periodLabel(year, month, half);
   const periodShort = periodText.replace(/^For the (month|period) of /, '');
   const closeSettings = useCallback(() => setEditing(false), []);
+  const closeAdjust = useCallback(() => setAdjusting(null), []);
+  const isoDay = (day) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const dayName = (day) => (day <= daysIn(year, month) ? `${MONTHS[month - 1]} ${day}, ${year}` : '');
+
+  const adjustCall = async (call) => {
+    try {
+      onDataChange(await call());
+    } catch (e) {
+      throw new Error(ipcError(e));
+    }
+    setAdjusting(null);
+  };
+
+  // Values for the adjust dialog: device punch, current (adjusted) value, and the stored adjustment.
+  const dayInfo = (day) => {
+    const date = isoDay(day);
+    const pick = (list, s) => list.find((p) => p.date === date && p.session === s);
+    const pair = (p) => ({ in: p?.in ?? '', out: p?.out ?? '' });
+    const keys = ['AM', 'PM'].map((s) => `${employee.office}|${employee.acNo}|${date}|${s}`);
+    const stored = keys.map((k) => adjustments[k]).filter(Boolean);
+    return {
+      date,
+      device: { am: pair(pick(device, 'AM')), pm: pair(pick(device, 'PM')) },
+      current: { am: pair(pick(punches, 'AM')), pm: pair(pick(punches, 'PM')) },
+      last: stored.length ? stored.sort((a, b) => b.at.localeCompare(a.at))[0] : null,
+    };
+  };
 
   const saveSettings = async (patch) => {
     let next;
@@ -96,14 +133,22 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       if (!byEmployee.has(p.acNo)) byEmployee.set(p.acNo, []);
       byEmployee.get(p.acNo).push(p);
     }
+    const adjByEmployee = new Map(); // acNo -> that employee's adjustments
+    const officePrefix = `${employee.office}|`;
+    for (const [k, a] of Object.entries(adjustments)) {
+      if (!k.startsWith(officePrefix)) continue;
+      const acNo = k.slice(officePrefix.length).split('|')[0];
+      if (!adjByEmployee.has(acNo)) adjByEmployee.set(acNo, {});
+      adjByEmployee.get(acNo)[k] = a;
+    }
     return Object.values(data.employees)
       .filter((e) => e.office === employee.office)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
-        const p = byEmployee.get(e.acNo) ?? [];
+        const p = effectivePunches(byEmployee.get(e.acNo) ?? [], adjByEmployee.get(e.acNo), e.office, e.acNo);
         return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes, holidays }) };
       });
-  }, [batch, data, employee.office, year, month, half, graceMinutes, holidays]);
+  }, [batch, data, employee.office, year, month, half, graceMinutes, holidays, adjustments]);
 
   return (
     <>
@@ -146,9 +191,11 @@ function Preview({ data, employee, onDataChange, onNotice }) {
           {working && <span className="muted">Working…</span>}
         </div>
       </div>
+      <p className="muted hint">Click a day number on the form to adjust its times. Adjusted times are highlighted here, not on the printout.</p>
       <div className="page main-page">
         <DtrForm name={employee.name} periodText={periodText}
-          officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge} />
+          officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge}
+          onDayClick={setAdjusting} dayName={dayName} />
       </div>
       {batch && (
         <div className="print-batch" aria-hidden="true">
@@ -160,6 +207,22 @@ function Preview({ data, employee, onDataChange, onNotice }) {
           ))}
         </div>
       )}
+      {adjusting && (() => {
+        const info = dayInfo(adjusting);
+        const day = { office: employee.office, acNo: employee.acNo, date: info.date };
+        return (
+          <AdjustDialog
+            key={info.date}
+            dateLabel={dayName(adjusting)}
+            device={info.device}
+            current={info.current}
+            last={info.last}
+            onSave={({ am, pm, reason }) => adjustCall(() => window.api.adjustDay({ ...day, am, pm, reason }))}
+            onRevert={() => adjustCall(() => window.api.revertDay(day))}
+            onCancel={closeAdjust}
+          />
+        );
+      })()}
       {editing && (
         <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings} />
       )}

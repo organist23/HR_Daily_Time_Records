@@ -4,7 +4,9 @@ import './dtr-form.css';
 const hours = (min) => (min ? String(Math.floor(min / 60)) : '');
 const mins = (min) => (min ? String(min % 60) : '');
 
-export default function DtrForm({ name, periodText, officialHours, half, result, inCharge }) {
+// onDayClick (app view only) makes day numbers buttons; dayName(day) gives their label, e.g. "July 1, 2026".
+export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName }) {
+  const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted'].filter(Boolean).join(' ') || undefined;
   // The form keeps the template's printed rows (16-31 even in a 30-day month).
   // computeDtr already blanks days outside the period, so only the half is chosen here.
   const rows = result.rows.filter((r) => (half === 'first' ? r.day <= 15 : half === 'second' ? r.day >= 16 : true));
@@ -62,15 +64,21 @@ export default function DtrForm({ name, periodText, officialHours, half, result,
         <tbody>
           {rows.map((r) => (
             <tr key={r.day} data-day={r.day}>
-              <td className="day sep">{r.day}</td>
+              <td className="day sep">
+                {onDayClick && dayName(r.day) ? (
+                  <button type="button" className="day-btn" aria-label={`Adjust ${dayName(r.day)}`} onClick={() => onDayClick(r.day)}>
+                    {r.day}
+                  </button>
+                ) : r.day}
+              </td>
               {r.label ? (
                 <td colSpan={4} className="label-cell sep">{r.label}</td>
               ) : (
                 <>
-                  <td>{r.amIn}</td>
-                  <td className="sep">{r.amOut}</td>
-                  <td>{r.pmIn}</td>
-                  <td className="sep">{r.pmOut}</td>
+                  <td className={cls(r, 'amIn')}>{r.amIn}</td>
+                  <td className={cls(r, 'amOut', 'sep')}>{r.amOut}</td>
+                  <td className={cls(r, 'pmIn')}>{r.pmIn}</td>
+                  <td className={cls(r, 'pmOut', 'sep')}>{r.pmOut}</td>
                 </>
               )}
               <td>{hours(r.undertime)}</td>

@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   updateOffice: (office, patch) => ipcRenderer.invoke('update-office', office, patch),
   saveHoliday: (holiday, originalDate) => ipcRenderer.invoke('save-holiday', holiday, originalDate),
   deleteHoliday: (date) => ipcRenderer.invoke('delete-holiday', date),
+  adjustDay: (day) => ipcRenderer.invoke('adjust-day', day),
+  revertDay: (day) => ipcRenderer.invoke('revert-day', day),
   print: () => ipcRenderer.invoke('print'),
   exportPdf: (suggestedName) => ipcRenderer.invoke('export-pdf', suggestedName),
 });

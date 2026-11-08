@@ -37,6 +37,24 @@ function session(p, graceMinutes) {
   return { undertime, credited: length - undertime };
 }
 
+// Device punches with the admin's adjustments laid over them. adjusted.in/out mark changed cells.
+export function effectivePunches(punches, adjustments, office, acNo) {
+  const prefix = `${office}|${acNo}|`;
+  const byKey = new Map(punches.map((p) => [`${p.date}|${p.session}`, p]));
+  for (const [key, a] of Object.entries(adjustments ?? {})) {
+    if (!key.startsWith(prefix)) continue;
+    const [date, session] = key.slice(prefix.length).split('|');
+    const device = byKey.get(`${date}|${session}`);
+    byKey.set(`${date}|${session}`, {
+      ...(device ?? { acNo, name: '', date, session, onDuty: a.onDuty, offDuty: a.offDuty }),
+      in: a.in,
+      out: a.out,
+      adjusted: { in: a.in !== (device?.in ?? ''), out: a.out !== (device?.out ?? '') },
+    });
+  }
+  return [...byKey.values()];
+}
+
 export function computeDtr({ punches, year, month, half, graceMinutes, holidays = {} }) {
   const [from, to] = periodRange(year, month, half);
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
@@ -46,7 +64,7 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
   let credited = 0;
   const rows = [];
   for (let day = 1; day <= 31; day++) {
-    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '' };
+    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
       const am = byKey.get(`${date}|AM`);
@@ -54,6 +72,8 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
       Object.assign(row, {
         amIn: formatTime(am?.in), amOut: formatTime(am?.out),
         pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
+        adjusted: [[am, 'in', 'amIn'], [am, 'out', 'amOut'], [pm, 'in', 'pmIn'], [pm, 'out', 'pmOut']]
+          .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
       });
       const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
       const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;

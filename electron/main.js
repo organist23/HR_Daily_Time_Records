@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday } from '../src/lib/store.js';
+import {
+  loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
+} from '../src/lib/store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
@@ -84,6 +86,9 @@ ipcMain.handle('update-office', (_event, office, patch) => mutate((d) => updateO
 ipcMain.handle('save-holiday', (_event, holiday, originalDate) =>
   mutate((d) => setHoliday(d, holiday ?? {}, originalDate ? String(originalDate) : undefined)));
 ipcMain.handle('delete-holiday', (_event, date) => mutate((d) => deleteHoliday(d, String(date))));
+// The adjustment time comes from main's clock, not the renderer.
+ipcMain.handle('adjust-day', (_event, day) => mutate((d) => adjustDay(d, day ?? {}, new Date().toISOString())));
+ipcMain.handle('revert-day', (_event, day) => mutate((d) => revertDay(d, day ?? {})));
 
 const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
 

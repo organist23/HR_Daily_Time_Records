@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { computeDtr, formatTime, periodLabel, officialHours } from '../src/lib/dtr.js';
+import { computeDtr, formatTime, periodLabel, officialHours, effectivePunches } from '../src/lib/dtr.js';
 
 const all = parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const of = (acNo) => all.filter((r) => r.acNo === acNo);
@@ -11,7 +11,7 @@ const july = (acNo, half = 'first', graceMinutes = 15) =>
 describe('computeDtr', () => {
   it('missing punch = 4h undertime, absent session = blank', () => {
     const r = july('568').rows[0]; // RONIE 7/01: AM 08:00 in only, PM absent
-    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240, label: '' });
+    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240, label: '', adjusted: [] });
   });
 
   it('late beyond grace counts from on-duty', () => {
@@ -58,7 +58,7 @@ describe('computeDtr', () => {
   it('days outside the period are blank', () => {
     const d = july('14', 'second');
     expect(d.rows).toHaveLength(31);
-    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '' });
+    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] });
     expect(d.credited).toBe(0);
   });
 
@@ -160,5 +160,47 @@ describe('holiday and weekend labels', () => {
     const sept = computeDtr({ punches: [], year: 2026, month: 9, half: 'full', graceMinutes: 15 });
     expect(sept.rows[30].label).toBe(''); // no September 31
     expect(sept.rows[4].label).toBe('SATURDAY'); // September 5, 2026
+  });
+});
+
+describe('adjustments', () => {
+  const AT = '2026-11-09T02:00:00.000Z';
+  const adj = {
+    'HRMO|568|2026-07-01|AM': { in: '08:00', out: '12:00', onDuty: '08:00', offDuty: '12:00', reason: 'WFH', at: AT },
+    'HRMO|568|2026-07-01|PM': { in: '13:00', out: '17:00', onDuty: '13:00', offDuty: '17:00', reason: 'WFH', at: AT },
+  };
+  const ronie = (adjustments, holidays = {}) => computeDtr({
+    punches: effectivePunches(of('568'), adjustments, 'HRMO', '568'), year: 2026, month: 7, half: 'first', graceMinutes: 15, holidays,
+  });
+
+  it('before: RONIE July 1-15 credits 1200 min (2 days), undertime 1200', () => {
+    // 7/02 480 + 7/03 480 + 7/06 AM 240; undertime 7/01 240, 7/06 240, 7/07 480, 7/08 240.
+    const d = ronie({});
+    expect([d.credited, d.days, d.totalUndertime]).toEqual([1200, 2, 1200]);
+  });
+
+  it('after a work-from-home fix on 7/01: 1680 min (3 days), undertime 960, 3 marked cells', () => {
+    const d = ronie(adj);
+    expect(d.rows[0]).toMatchObject({ amIn: '8:00', amOut: '12:00', pmIn: '1:00', pmOut: '5:00', undertime: 0, adjusted: ['amOut', 'pmIn', 'pmOut'] });
+    expect([d.credited, d.days, d.totalUndertime]).toEqual([1680, 3, 960]);
+  });
+
+  it('adds a punch on a day with no device rows', () => {
+    const extra = { 'HRMO|568|2026-07-13|AM': { in: '08:00', out: '12:00', onDuty: '08:00', offDuty: '12:00', reason: 'WFH', at: AT } };
+    expect(ronie(extra).rows[12]).toMatchObject({ amIn: '8:00', amOut: '12:00', adjusted: ['amIn', 'amOut'] });
+  });
+
+  it('ignores other employees and other offices', () => {
+    expect(effectivePunches(of('568'), { 'ACCT|568|2026-07-01|AM': adj['HRMO|568|2026-07-01|AM'] }, 'HRMO', '568')).toEqual(of('568'));
+  });
+
+  it('a cleared cell counts as adjusted', () => {
+    const cleared = { 'HRMO|568|2026-07-01|AM': { in: '', out: '', onDuty: '08:00', offDuty: '12:00', reason: 'Wrong punch', at: AT } };
+    expect(ronie(cleared).rows[0]).toMatchObject({ amIn: '', undertime: 0, adjusted: ['amIn'] });
+  });
+
+  it('adjusted times on a holiday show instead of the label', () => {
+    const h = { '2026-07-01': { date: '2026-07-01', name: 'X', type: 'Local Holiday' } };
+    expect(ronie(adj, h).rows[0]).toMatchObject({ label: '', amOut: '12:00', undertime: 0 });
   });
 });
