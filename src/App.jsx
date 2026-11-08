@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
-import { computeDtr, formatTime, periodLabel } from './lib/dtr.js';
+import { MONTHS, computeDtr, formatTime, periodLabel } from './lib/dtr.js';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-  'August', 'September', 'October', 'November', 'December'];
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
 function Preview({ data, employee }) {
@@ -16,13 +14,18 @@ function Preview({ data, employee }) {
   const latest = punches.reduce((max, p) => (p.date > max ? p.date : max), '');
   const today = new Date();
   const [year, setYear] = useState(latest ? Number(latest.slice(0, 4)) : today.getFullYear());
+  const [yearText, setYearText] = useState(String(year)); // year applies only once 4 digits are typed
   const [month, setMonth] = useState(latest ? Number(latest.slice(5, 7)) : today.getMonth() + 1);
   const [half, setHalf] = useState('full');
 
   const graceMinutes = data.offices[employee.office]?.graceMinutes ?? 15;
   const result = computeDtr({ punches, year, month, half, graceMinutes });
-  const am = punches.find((p) => p.session === 'AM');
-  const pm = punches.find((p) => p.session === 'PM');
+  // Official hours from the shown month's punches; fall back to any punch for an empty month.
+  const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`;
+  const inMonth = punches.filter((p) => p.date.startsWith(monthPrefix));
+  const pickSession = (s) => inMonth.find((p) => p.session === s) ?? punches.find((p) => p.session === s);
+  const am = pickSession('AM');
+  const pm = pickSession('PM');
   const officialHours = [am, pm].filter(Boolean)
     .map((p) => `${formatTime(p.onDuty)}-${formatTime(p.offDuty)}`).join(', ');
 
@@ -37,8 +40,12 @@ function Preview({ data, employee }) {
         </label>
         <label>
           Year{' '}
-          <input aria-label="Year" type="number" min="2000" max="2100" value={year}
-            onChange={(e) => e.target.value && setYear(Number(e.target.value))} />
+          <input aria-label="Year" type="number" min="2000" max="2100" value={yearText}
+            onChange={(e) => {
+              setYearText(e.target.value);
+              const y = Number(e.target.value);
+              if (y >= 2000 && y <= 2100) setYear(y);
+            }} />
         </label>
         <fieldset className="halves">
           <legend className="sr-only">Period</legend>

@@ -1,4 +1,4 @@
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'];
 
 const minutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
@@ -10,10 +10,16 @@ export function formatTime(hhmm) {
   return `${h}:${hhmm.slice(3)}`;
 }
 
+// First and last day of the period. 'second' ends on the month's last day.
+export function periodRange(year, month, half) {
+  const last = daysIn(year, month);
+  return half === 'first' ? [1, 15] : half === 'second' ? [16, last] : [1, last];
+}
+
 export function periodLabel(year, month, half) {
   const name = MONTHS[month - 1];
   if (half === 'full') return `For the month of ${name} ${year}`;
-  const [from, to] = half === 'first' ? [1, 15] : [16, daysIn(year, month)];
+  const [from, to] = periodRange(year, month, half);
   return `For the period of ${name} ${from}-${to}, ${year}`;
 }
 
@@ -30,8 +36,7 @@ function session(p, graceMinutes) {
 }
 
 export function computeDtr({ punches, year, month, half, graceMinutes }) {
-  const last = daysIn(year, month);
-  const [from, to] = half === 'first' ? [1, 15] : half === 'second' ? [16, last] : [1, last];
+  const [from, to] = periodRange(year, month, half);
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
   const byKey = new Map(punches.map((p) => [`${p.date}|${p.session}`, p]));
 

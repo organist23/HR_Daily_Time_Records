@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as XLSX from 'xlsx';
+import { readSheetRows } from '../../src/lib/parse.js';
 import { tmpDir, HRMO, launch, importFiles, employeeButtons } from './helpers.js';
 
 test('US-1 import per office, persist, re-import, bad files', async () => {
@@ -27,7 +28,7 @@ test('US-1 import per office, persist, re-import, bad files', async () => {
 
   const bad = path.join(tmpDir(), 'bad.xls');
   fs.writeFileSync(bad, Buffer.from([0, 1, 2, 3, 255, 254, 9, 9, 0]));
-  const rows = XLSX.utils.sheet_to_json(XLSX.read(fs.readFileSync(HRMO)).Sheets.Sheet1, { header: 1, raw: false, defval: '' });
+  const rows = readSheetRows(fs.readFileSync(HRMO));
   const noOut = path.join(tmpDir(), 'noout.xlsx');
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows.map((r) => r.filter((_, i) => i !== 7))), 'Sheet1');
@@ -66,6 +67,10 @@ test('US-3 preview single-copy DTR for a period', async () => {
   await expect(form).toHaveCount(1);
   await expect(page.getByLabel('Month', { exact: true })).toHaveValue('7');
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('2026');
+  // Partial year while typing must not change the period.
+  await page.getByLabel('Year', { exact: true }).fill('20');
+  await expect(form).toContainText('July 2026');
+  await page.getByLabel('Year', { exact: true }).fill('2026');
   await page.getByRole('radio', { name: '1–15' }).check();
   await expect(form).toContainText('For the period of July 1-15, 2026');
   await expect(form).toContainText('RONIE LOUISE BERMUDEZ');

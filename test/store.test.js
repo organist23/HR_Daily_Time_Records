@@ -44,6 +44,22 @@ describe('resolveOffice', () => {
     expect(resolveOffice(data, ' Accounting ')).toBe('Accounting');
     expect(() => resolveOffice(data, '   ')).toThrow();
   });
+
+  it('rejects | in office names (it separates record keys)', () => {
+    expect(() => resolveOffice(emptyData(), 'HR|1')).toThrow(/\|/);
+  });
+});
+
+describe('office names that clash with object internals', () => {
+  it('stores __proto__ and constructor as normal offices', () => {
+    const data = emptyData();
+    const records = hrmo().slice(0, 2);
+    mergeImport(data, '__proto__', records);
+    mergeImport(data, 'constructor', records);
+    expect(Object.keys(data.offices).sort()).toEqual(['__proto__', 'constructor']);
+    expect(data.offices.constructor).toEqual({ name: 'constructor', graceMinutes: 15 });
+    expect(JSON.parse(JSON.stringify(data)).offices.__proto__).toEqual({ name: '__proto__', graceMinutes: 15 });
+  });
 });
 
 describe('loadData / saveData', () => {

@@ -1,14 +1,13 @@
 import './dtr-form.css';
 
-const RANGES = { full: [1, 31], first: [1, 15], second: [16, 31] };
-
 // Undertime cells stay blank when there is none, as on the handwritten reference.
 const hours = (min) => (min ? String(Math.floor(min / 60)) : '');
 const mins = (min) => (min ? String(min % 60) : '');
 
 export default function DtrForm({ name, periodText, officialHours, half, result }) {
-  const [from, to] = RANGES[half];
-  const rows = result.rows.filter((r) => r.day >= from && r.day <= to);
+  // The form keeps the template's printed rows (16-31 even in a 30-day month).
+  // computeDtr already blanks days outside the period, so only the half is chosen here.
+  const rows = result.rows.filter((r) => (half === 'first' ? r.day <= 15 : half === 'second' ? r.day >= 16 : true));
   const split = periodText.indexOf(' of ') + 4;
 
   return (

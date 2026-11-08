@@ -10,11 +10,13 @@ export function emptyData() {
 export function resolveOffice(data, typed) {
   const name = String(typed ?? '').trim();
   if (!name) throw new Error('Office name is required');
+  if (name.includes('|')) throw new Error('Office name cannot contain |');
   return Object.keys(data.offices).find((o) => o.toLowerCase() === name.toLowerCase()) ?? name;
 }
 
 export function mergeImport(data, office, records) {
-  data.offices[office] ??= { name: office, graceMinutes: 15 };
+  // Own-key check and object-literal define, so names like "__proto__" are stored as plain keys.
+  if (!Object.hasOwn(data.offices, office)) data.offices = { ...data.offices, [office]: { name: office, graceMinutes: 15 } };
   let added = 0;
   let updated = 0;
   for (const r of records) {

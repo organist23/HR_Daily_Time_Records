@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import * as XLSX from 'xlsx';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 
 const hrmoRows = () => readSheetRows(fs.readFileSync('sample_data/HRMO.xls'));
@@ -39,6 +40,23 @@ describe('parseRows', () => {
     const { records, skipped } = parseRows(rows);
     expect(skipped).toBe(2);
     expect(records).toHaveLength(154);
+  });
+
+  it('accepts real Excel date and time cells in an .xlsx', () => {
+    const header = hrmoRows()[0];
+    const ws = XLSX.utils.aoa_to_sheet([header,
+      ['5', 'Y', new Date(2026, 6, 1), 'Morning', '08:00', '12:00', '8:05 AM', '12:00 PM', '', '', '']], { cellDates: true });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const rows = readSheetRows(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+    const { records, skipped } = parseRows(rows);
+    expect(skipped).toBe(0);
+    expect(records[0]).toMatchObject({ date: '2026-07-01', in: '08:05', out: '12:00' });
+  });
+
+  it('converts 12h AM/PM times and 2-digit years', () => {
+    const rows = [hrmoRows()[0], ['1', 'X', '7/1/26', 'Afternoon', '13:00', '17:00', '1:05 PM', '12:30 AM', '', '', '']];
+    expect(parseRows(rows).records[0]).toMatchObject({ date: '2026-07-01', in: '13:05', out: '00:30' });
   });
 
   it('accepts ISO dates and unpadded times', () => {
