@@ -115,10 +115,10 @@ function Preview({ data, employee, onDataChange, onNotice }) {
         </label>
         <button onClick={() => setEditing(true)}>Office settings</button>
         <div className="print-actions">
-          <button disabled={working} onClick={() => job('print')}>Print</button>
-          <button disabled={working} onClick={() => job('pdf', employee.name)}>Export PDF</button>
-          <button disabled={working} onClick={() => setBatch({ kind: 'print' })}>Print office</button>
-          <button disabled={working} onClick={() => setBatch({ kind: 'pdf', name: employee.office })}>Export office PDF</button>
+          <button disabled={working || !!batch} onClick={() => job('print')}>Print</button>
+          <button disabled={working || !!batch} onClick={() => job('pdf', employee.name)}>Export PDF</button>
+          <button disabled={working || !!batch} onClick={() => setBatch({ kind: 'print' })}>Print office</button>
+          <button disabled={working || !!batch} onClick={() => setBatch({ kind: 'pdf', name: employee.office })}>Export office PDF</button>
           {working && <span className="muted">Working…</span>}
         </div>
       </div>
