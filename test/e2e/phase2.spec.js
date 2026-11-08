@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { tmpDir, launch, importHrmo } from './helpers.js';
 
+// Scoped to the Holidays view: the DTR preview stays mounted (hidden) with its own Month and Year.
 const showJuly2026 = async (page) => {
-  await page.getByLabel('Month', { exact: true }).selectOption('7');
-  await page.getByLabel('Year', { exact: true }).fill('2026');
+  const view = page.getByRole('region', { name: 'Holidays' });
+  await view.getByLabel('Month', { exact: true }).selectOption('7');
+  await view.getByLabel('Year', { exact: true }).fill('2026');
 };
 
 test('US-6 holidays: add, calendar, labels, edit, persist, delete', async () => {
@@ -74,5 +76,18 @@ test('US-6 holidays: add, calendar, labels, edit, persist, delete', async () => 
   await page.getByRole('button', { name: /MARY ANN EGTAPEN/ }).click();
   await expect(form2.locator('tr[data-day="3"] .label-cell')).toHaveCount(0);
   await expect(form2.locator('tr[data-day="3"] td').nth(1)).toHaveText('');
+  await app.close();
+});
+
+test('US-6 opening Holidays keeps the DTR period and one-print override', async () => {
+  const { app, page } = await launch(tmpDir());
+  await importHrmo(app, page);
+  await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await page.getByRole('radio', { name: '16–31' }).check();
+  await page.getByLabel('In charge (this print)').fill('JUAN DELA CRUZ');
+  await page.getByRole('button', { name: 'Holidays' }).click();
+  await page.getByRole('button', { name: 'DTR preview' }).click();
+  await expect(page.getByRole('radio', { name: '16–31' })).toBeChecked();
+  await expect(page.getByLabel('In charge (this print)')).toHaveValue('JUAN DELA CRUZ');
   await app.close();
 });

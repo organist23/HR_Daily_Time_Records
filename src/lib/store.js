@@ -54,7 +54,6 @@ export function updateOffice(data, office, { inCharge, graceMinutes }) {
   data.offices = { ...data.offices, [office]: { ...data.offices[office], graceMinutes: grace, inCharge: name } };
 }
 
-export { HOLIDAY_TYPES };
 
 const isIsoDate = (s) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
@@ -77,6 +76,7 @@ export function setHoliday(data, { date, name, type }, originalDate) {
 }
 
 export function deleteHoliday(data, date) {
+  if (!Object.hasOwn(data.holidays ?? {}, date)) throw new Error(`No holiday on ${date}`);
   const next = { ...(data.holidays ?? {}) };
   delete next[date];
   data.holidays = next;

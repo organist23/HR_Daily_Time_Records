@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import useDialogKeys from './useDialogKeys.js';
 
 const baseName = (p) => p.split(/[\\/]/).pop();
 const stem = (p) => baseName(p).replace(/\.[^.]+$/, '');
@@ -7,12 +8,7 @@ export default function ImportDialog({ paths, offices, onImport, onCancel }) {
   const [names, setNames] = useState(() => paths.map(stem));
   const first = useRef(null);
 
-  useEffect(() => {
-    first.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  useDialogKeys(first, onCancel);
 
   const submit = (e) => {
     e.preventDefault();

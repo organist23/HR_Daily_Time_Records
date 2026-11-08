@@ -5,6 +5,7 @@ import OfficeDialog from './OfficeDialog.jsx';
 import HolidaysView from './HolidaysView.jsx';
 import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 
+const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
 // Electron prefixes errors thrown in main; show only the message.
@@ -31,7 +32,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
 
   const graceMinutes = settings.graceMinutes ?? 15;
-  const holidays = data.holidays ?? {};
+  const holidays = data.holidays ?? NO_HOLIDAYS;
   const result = computeDtr({ punches, year, month, half, graceMinutes, holidays });
   const periodText = periodLabel(year, month, half);
   const periodShort = periodText.replace(/^For the (month|period) of /, '');
@@ -145,7 +146,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
           {working && <span className="muted">Working…</span>}
         </div>
       </div>
-      <div className="page">
+      <div className="page main-page">
         <DtrForm name={employee.name} periodText={periodText}
           officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge} />
       </div>
@@ -279,17 +280,21 @@ export default function App() {
           ))}
         </nav>
         <main className="preview">
-          {view === 'holidays' && data ? (
+          {view === 'holidays' && data && (
             <HolidaysView
-              holidays={data.holidays ?? {}}
+              holidays={data.holidays ?? NO_HOLIDAYS}
               onSave={(h, originalDate) => holidayCall(() => window.api.saveHoliday(h, originalDate))}
               onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
             />
-          ) : employee ? (
-            <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
-          ) : (
-            <p className="muted">Select an employee to preview their DTR.</p>
           )}
+          {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
+          <div hidden={view !== 'dtr'}>
+            {employee ? (
+              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
+            ) : (
+              <p className="muted empty-hint">Select an employee to preview their DTR.</p>
+            )}
+          </div>
         </main>
       </div>
 

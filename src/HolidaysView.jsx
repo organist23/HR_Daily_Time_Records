@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import HolidayDialog from './HolidayDialog.jsx';
-import { MONTHS } from './lib/dtr.js';
+import { MONTHS, daysIn } from './lib/dtr.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const iso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -14,7 +14,7 @@ export default function HolidaysView({ holidays, onSave, onDelete }) {
   const close = useCallback(() => setDialog(null), []);
 
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const days = daysIn(year, month);
   const prefix = iso(year, month, 1).slice(0, 8);
   const inMonth = Object.values(holidays).filter((h) => h.date.startsWith(prefix)).sort((a, b) => a.date.localeCompare(b.date));
 

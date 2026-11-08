@@ -48,9 +48,9 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 /* Print and PDF: only DTR pages. An office batch replaces the on-screen page. */
 @media print {
   body, .app, .body, .preview { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; }
-  .topbar, .results, .sidebar, .controls, .backdrop, .preview > p { display: none !important; }
+  .topbar, .results, .sidebar, .controls, .backdrop, .empty-hint, .holidays { display: none !important; }
   .print-batch { display: block; }
-  .preview:has(.print-batch) > .page { display: none; }
+  .preview:has(.print-batch) .main-page { display: none; }
 }
 .top-actions { display: flex; gap: 8px; }
 button.danger { color: var(--danger); border-color: var(--danger); }

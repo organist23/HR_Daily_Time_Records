@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import useDialogKeys from './useDialogKeys.js';
 
 export default function OfficeDialog({ office, settings, onSave, onCancel }) {
   const [inCharge, setInCharge] = useState(settings.inCharge ?? '');
@@ -7,12 +8,7 @@ export default function OfficeDialog({ office, settings, onSave, onCancel }) {
   const [busy, setBusy] = useState(false);
   const first = useRef(null);
 
-  useEffect(() => {
-    first.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  useDialogKeys(first, onCancel, busy);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -40,7 +36,7 @@ export default function OfficeDialog({ office, settings, onSave, onCancel }) {
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <div className="actions">
-          <button type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
           <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         </div>
       </form>

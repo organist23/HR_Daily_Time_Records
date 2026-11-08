@@ -4,7 +4,7 @@ export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', '
   'August', 'September', 'October', 'November', 'December'];
 
 const minutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
-const daysIn = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+export const daysIn = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 export function formatTime(hhmm) {
   if (!hhmm) return '';
@@ -55,17 +55,17 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
         amIn: formatTime(am?.in), amOut: formatTime(am?.out),
         pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
       });
+      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+      const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;
+      const offLabel = holiday ? String(holiday.type || 'Holiday').toUpperCase()
+        : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
       for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
-        row.undertime += s.undertime;
+        if (!offLabel) row.undertime += s.undertime; // not a workday: no undertime, worked time still counts
         credited += s.credited;
       }
       totalUndertime += row.undertime;
-      // Holiday or weekend label only when the day has no times (work on those days still shows).
-      if (!row.amIn && !row.amOut && !row.pmIn && !row.pmOut) {
-        const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-        row.label = Object.hasOwn(holidays, date) ? holidays[date].type.toUpperCase()
-          : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
-      }
+      // The label shows only when the day has no times, so work on those days stays visible.
+      if (!row.amIn && !row.amOut && !row.pmIn && !row.pmOut) row.label = offLabel;
     }
     rows.push(row);
   }

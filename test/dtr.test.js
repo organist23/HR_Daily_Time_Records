@@ -136,6 +136,20 @@ describe('holiday and weekend labels', () => {
     expect(r).toMatchObject({ label: '', amIn: '8:00' });
   });
 
+  it('no undertime on a holiday or weekend, but worked time still counts', () => {
+    const sat = { acNo: '1', name: 'X', date: '2026-07-04', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:00', out: '' };
+    const hol = { acNo: '1', name: 'X', date: '2026-07-03', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '09:00', out: '12:00' };
+    const d = computeDtr({ punches: [sat, hol], year: 2026, month: 7, half: 'full', graceMinutes: 15, holidays });
+    expect(d.rows[3].undertime).toBe(0); // Saturday, departure missing
+    expect(d.rows[2].undertime).toBe(0); // holiday, 1h late
+    expect(d.credited).toBe(180); // 9:00-12:00 on the holiday
+  });
+
+  it('a malformed holiday entry still labels instead of crashing', () => {
+    const bad = { '2026-07-03': { date: '2026-07-03', name: 'X' } };
+    expect(withHolidays('783', 'first', bad).rows[2].label).toBe('HOLIDAY');
+  });
+
   it('a holiday on a weekend shows the holiday', () => {
     const h = { '2026-07-04': { date: '2026-07-04', name: 'X', type: 'Local Holiday' } };
     expect(withHolidays('14', 'first', h).rows[3].label).toBe('LOCAL HOLIDAY');

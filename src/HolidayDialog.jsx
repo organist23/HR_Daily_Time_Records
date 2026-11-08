@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import useDialogKeys from './useDialogKeys.js';
 import { HOLIDAY_TYPES } from './lib/dtr.js';
 
 // holiday = existing holiday to edit, or null to add one on defaultDate.
@@ -10,12 +11,7 @@ export default function HolidayDialog({ holiday, defaultDate, onSave, onDelete, 
   const [busy, setBusy] = useState(false);
   const first = useRef(null);
 
-  useEffect(() => {
-    first.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  useDialogKeys(first, onCancel, busy);
 
   const run = async (action) => {
     setBusy(true);
@@ -63,7 +59,7 @@ export default function HolidayDialog({ holiday, defaultDate, onSave, onDelete, 
             </button>
           )}
           <span className="spacer" />
-          <button type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
           <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         </div>
       </form>

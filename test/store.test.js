@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, HOLIDAY_TYPES } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday } from '../src/lib/store.js';
+import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const made = [];
@@ -182,6 +183,10 @@ describe('holidays', () => {
     const data = emptyData();
     expect(() => setHoliday(data, h)).toThrow(err);
     expect(data.holidays).toEqual({});
+  });
+
+  it('rejects deleting a date with no holiday', () => {
+    expect(() => deleteHoliday(emptyData(), '2026-07-03')).toThrow('No holiday on 2026-07-03');
   });
 
   it('deletes', () => {
