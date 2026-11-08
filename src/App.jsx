@@ -30,7 +30,8 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
 
   const graceMinutes = settings.graceMinutes ?? 15;
-  const result = computeDtr({ punches, year, month, half, graceMinutes });
+  const holidays = data.holidays ?? {};
+  const result = computeDtr({ punches, year, month, half, graceMinutes, holidays });
   const periodText = periodLabel(year, month, half);
   const periodShort = periodText.replace(/^For the (month|period) of /, '');
   const closeSettings = useCallback(() => setEditing(false), []);
@@ -98,9 +99,9 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
         const p = byEmployee.get(e.acNo) ?? [];
-        return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes }) };
+        return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes, holidays }) };
       });
-  }, [batch, data, employee.office, year, month, half, graceMinutes]);
+  }, [batch, data, employee.office, year, month, half, graceMinutes, holidays]);
 
   return (
     <>

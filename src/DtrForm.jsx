@@ -63,10 +63,16 @@ export default function DtrForm({ name, periodText, officialHours, half, result,
           {rows.map((r) => (
             <tr key={r.day} data-day={r.day}>
               <td className="day sep">{r.day}</td>
-              <td>{r.amIn}</td>
-              <td className="sep">{r.amOut}</td>
-              <td>{r.pmIn}</td>
-              <td className="sep">{r.pmOut}</td>
+              {r.label ? (
+                <td colSpan={4} className="label-cell sep">{r.label}</td>
+              ) : (
+                <>
+                  <td>{r.amIn}</td>
+                  <td className="sep">{r.amOut}</td>
+                  <td>{r.pmIn}</td>
+                  <td className="sep">{r.pmOut}</td>
+                </>
+              )}
               <td>{hours(r.undertime)}</td>
               <td>{mins(r.undertime)}</td>
             </tr>

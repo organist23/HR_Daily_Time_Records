@@ -35,7 +35,7 @@ function session(p, graceMinutes) {
   return { undertime, credited: length - undertime };
 }
 
-export function computeDtr({ punches, year, month, half, graceMinutes }) {
+export function computeDtr({ punches, year, month, half, graceMinutes, holidays = {} }) {
   const [from, to] = periodRange(year, month, half);
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
   const byKey = new Map(punches.map((p) => [`${p.date}|${p.session}`, p]));
@@ -44,7 +44,7 @@ export function computeDtr({ punches, year, month, half, graceMinutes }) {
   let credited = 0;
   const rows = [];
   for (let day = 1; day <= 31; day++) {
-    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0 };
+    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '' };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
       const am = byKey.get(`${date}|AM`);
@@ -58,6 +58,12 @@ export function computeDtr({ punches, year, month, half, graceMinutes }) {
         credited += s.credited;
       }
       totalUndertime += row.undertime;
+      // Holiday or weekend label only when the day has no times (work on those days still shows).
+      if (!row.amIn && !row.amOut && !row.pmIn && !row.pmOut) {
+        const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+        row.label = Object.hasOwn(holidays, date) ? holidays[date].type.toUpperCase()
+          : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
+      }
     }
     rows.push(row);
   }
