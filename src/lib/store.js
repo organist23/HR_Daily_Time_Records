@@ -4,7 +4,7 @@ import path from 'node:path';
 const FILE = 'dtr-data.json';
 
 export function emptyData() {
-  return { version: 1, offices: {}, employees: {}, punches: {} };
+  return { version: 1, offices: {}, employees: {}, punches: {}, holidays: {} };
 }
 
 export function resolveOffice(data, typed) {
@@ -51,4 +51,32 @@ export function updateOffice(data, office, { inCharge, graceMinutes }) {
   const name = String(inCharge ?? '').trim();
   if (name.length > 100) throw new Error('In-charge name is too long (max 100 characters)');
   data.offices = { ...data.offices, [office]: { ...data.offices[office], graceMinutes: grace, inCharge: name } };
+}
+
+export const HOLIDAY_TYPES = ['Regular Holiday', 'Special Non-Working Holiday', 'Local Holiday', 'Work Suspension'];
+
+const isIsoDate = (s) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+};
+
+// One holiday per date (dates are the keys). originalDate is the date being edited, if any.
+export function setHoliday(data, { date, name, type }, originalDate) {
+  if (!isIsoDate(date)) throw new Error('Invalid date');
+  const label = String(name ?? '').trim();
+  if (!label || label.length > 100) throw new Error('Holiday name must be 1 to 100 characters');
+  if (!HOLIDAY_TYPES.includes(type)) throw new Error('Unknown holiday type');
+  const holidays = data.holidays ?? {};
+  if (date !== originalDate && Object.hasOwn(holidays, date)) throw new Error(`A holiday already exists on ${date}`);
+  const next = { ...holidays };
+  if (originalDate && originalDate !== date) delete next[originalDate];
+  next[date] = { date, name: label, type };
+  data.holidays = next;
+}
+
+export function deleteHoliday(data, date) {
+  const next = { ...(data.holidays ?? {}) };
+  delete next[date];
+  data.holidays = next;
 }
