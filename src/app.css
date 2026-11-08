@@ -47,6 +47,7 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }
 .dialog { background: var(--panel); border-radius: 8px; padding: 20px; width: 460px; max-width: calc(100% - 32px); }
 .dialog h2 { margin: 0 0 4px; font-size: 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; }
 .file-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-row input { width: 180px; }

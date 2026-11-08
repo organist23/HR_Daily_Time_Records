@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
-import { MONTHS, computeDtr, formatTime, periodLabel } from './lib/dtr.js';
+import OfficeDialog from './OfficeDialog.jsx';
+import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
-function Preview({ data, employee }) {
+// Electron prefixes errors thrown in main; show only the message.
+const ipcError = (e) => e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+function Preview({ data, employee, onDataChange }) {
   const punches = useMemo(() => {
     const prefix = `${employee.office}|${employee.acNo}|`;
     return Object.entries(data.punches).filter(([k]) => k.startsWith(prefix)).map(([, p]) => p);
@@ -17,17 +21,24 @@ function Preview({ data, employee }) {
   const [yearText, setYearText] = useState(String(year)); // year applies only once 4 digits are typed
   const [month, setMonth] = useState(latest ? Number(latest.slice(5, 7)) : today.getMonth() + 1);
   const [half, setHalf] = useState('full');
+  const settings = data.offices[employee.office] ?? {};
+  const [inCharge, setInCharge] = useState(settings.inCharge ?? ''); // one-print override, never saved
+  const [editing, setEditing] = useState(false);
 
-  const graceMinutes = data.offices[employee.office]?.graceMinutes ?? 15;
-  const result = computeDtr({ punches, year, month, half, graceMinutes });
-  // Official hours from the shown month's punches; fall back to any punch for an empty month.
-  const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`;
-  const inMonth = punches.filter((p) => p.date.startsWith(monthPrefix));
-  const pickSession = (s) => inMonth.find((p) => p.session === s) ?? punches.find((p) => p.session === s);
-  const am = pickSession('AM');
-  const pm = pickSession('PM');
-  const officialHours = [am, pm].filter(Boolean)
-    .map((p) => `${formatTime(p.onDuty)}-${formatTime(p.offDuty)}`).join(', ');
+  const result = computeDtr({ punches, year, month, half, graceMinutes: settings.graceMinutes ?? 15 });
+  const closeSettings = useCallback(() => setEditing(false), []);
+
+  const saveSettings = async (patch) => {
+    let next;
+    try {
+      next = await window.api.updateOffice(employee.office, patch);
+    } catch (e) {
+      throw new Error(ipcError(e));
+    }
+    onDataChange(next);
+    setInCharge(next.offices[employee.office].inCharge);
+    setEditing(false);
+  };
 
   return (
     <>
@@ -56,11 +67,20 @@ function Preview({ data, employee }) {
             </label>
           ))}
         </fieldset>
+        <label>
+          In charge (this print){' '}
+          <input aria-label="In charge (this print)" value={inCharge} maxLength={100}
+            onChange={(e) => setInCharge(e.target.value)} />
+        </label>
+        <button onClick={() => setEditing(true)}>Office settings</button>
       </div>
       <div className="page">
         <DtrForm name={employee.name} periodText={periodLabel(year, month, half)}
-          officialHours={officialHours} half={half} result={result} />
+          officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge} />
       </div>
+      {editing && (
+        <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings} />
+      )}
     </>
   );
 }
@@ -162,7 +182,7 @@ export default function App() {
         </nav>
         <main className="preview">
           {employee ? (
-            <Preview key={selected} data={data} employee={employee} />
+            <Preview key={selected} data={data} employee={employee} onDataChange={setData} />
           ) : (
             <p className="muted">Select an employee to preview their DTR.</p>
           )}

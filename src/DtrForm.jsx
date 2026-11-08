@@ -4,7 +4,7 @@ import './dtr-form.css';
 const hours = (min) => (min ? String(Math.floor(min / 60)) : '');
 const mins = (min) => (min ? String(min % 60) : '');
 
-export default function DtrForm({ name, periodText, officialHours, half, result }) {
+export default function DtrForm({ name, periodText, officialHours, half, result, inCharge }) {
   // The form keeps the template's printed rows (16-31 even in a 30-day month).
   // computeDtr already blanks days outside the period, so only the half is chosen here.
   const rows = result.rows.filter((r) => (half === 'first' ? r.day <= 15 : half === 'second' ? r.day >= 16 : true));
@@ -94,7 +94,7 @@ export default function DtrForm({ name, periodText, officialHours, half, result 
 
       <p className="verified">VERIFIED as to the prescribed office hours:</p>
 
-      <div className="sign-line"></div>
+      <div className="sign-line in-charge-name">{inCharge}</div>
       <p className="caption in-charge">In Charge</p>
     </article>
   );

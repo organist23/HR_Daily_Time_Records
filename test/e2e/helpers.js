@@ -24,3 +24,10 @@ export async function importFiles(app, page, files) {
 }
 
 export const employeeButtons = (page) => page.getByRole('navigation', { name: 'Employees' }).getByRole('button');
+
+export async function importHrmo(app, page) {
+  const dlg = await importFiles(app, page, [HRMO]);
+  await dlg.getByLabel('Office for HRMO (3).xls').fill('HRMO');
+  await dlg.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('heading', { name: 'HRMO' }).waitFor();
+}
