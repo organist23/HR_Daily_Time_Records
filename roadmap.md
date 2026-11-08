@@ -60,16 +60,36 @@ Conventions later phases inherit:
 - Status messages go through `onNotice([{ ok, text }])`. IPC errors are shown with `ipcError(e)`.
 - E2E temp folders come only from `tmpDir()`, which global teardown deletes.
 
-### Phase 2 — Holidays and weekends NEXT
+### Phase 2 — Holidays and weekends ✅ DONE (merged `98fae7f`, 2026-11-08)
 
 Covers US-6.
 
 - Holiday add/edit/delete with type and a calendar view
 - Holiday and weekend labels across the DTR rows
 
-**Done when:** adding a Regular Holiday on 7/03/2026 shows its label on employees with no punches that day, and Saturdays/Sundays show their labels.
+**Done when:** adding a Regular Holiday on 7/03/2026 shows its label on employees with no punches that day, and Saturdays/Sundays show their labels. — **Verified** on 2026-11-08 with Playwright `_electron` and Vitest: 64/64 unit, 7/7 E2E. Checked:
+- add, edit, delete and relaunch
+- duplicate dates rejected
+- labels on MARY ANN 7/03 and July 4/5, with RELITA's 7/03 times kept
+- the calendar and DTR screenshots
 
-### Phase 3 — Time adjustments LATER
+Results: `PHASE-2-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/store.js`: `setHoliday`, `deleteHoliday`.
+- `src/lib/dtr.js`: `HOLIDAY_TYPES`, `daysIn`, and `computeDtr({ holidays })` with `row.label`.
+- `electron/main.js`: IPC `save-holiday`, `delete-holiday`, plus the `mutate` helper.
+- React UI: `src/HolidaysView.jsx`, `src/HolidayDialog.jsx`, `src/useDialogKeys.js`.
+
+Picked up from phase 1: the office print blank-page warning (merged `d500338`). After an office print or PDF it lists employees with no time records.
+
+Conventions later phases inherit:
+- Every data change in main goes through `mutate(change)` (clone, change, save, commit).
+- Holidays and weekends never charge undertime, and their label shows only when the day has no times.
+- Dialogs use `useDialogKeys(firstRef, onCancel, busy)`.
+- The DTR preview stays mounted while hidden, so E2E tests scope duplicate labels (Month, Year) to the visible view.
+
+### Phase 3 — Time adjustments NEXT
 
 Covers US-7.
 
