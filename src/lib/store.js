@@ -5,7 +5,7 @@ import { HOLIDAY_TYPES } from './dtr.js';
 const FILE = 'dtr-data.json';
 
 export function emptyData() {
-  return { version: 1, offices: {}, employees: {}, punches: {}, holidays: {} };
+  return { version: 1, offices: {}, employees: {}, punches: {}, holidays: {}, adjustments: {} };
 }
 
 export function resolveOffice(data, typed) {
@@ -80,4 +80,53 @@ export function deleteHoliday(data, date) {
   const next = { ...(data.holidays ?? {}) };
   delete next[date];
   data.holidays = next;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DEFAULT_HOURS = { AM: ['08:00', '12:00'], PM: ['13:00', '17:00'] };
+
+// Session hours for a day without a device row: the employee's other punches, else 8-12 / 1-5.
+function sessionHours(data, office, acNo, session) {
+  const prefix = `${office}|${acNo}|`;
+  const p = Object.entries(data.punches).find(([k, v]) => k.startsWith(prefix) && v.session === session)?.[1];
+  return p ? [p.onDuty, p.offDuty] : DEFAULT_HOURS[session];
+}
+
+// Sets both sessions of one day. Values equal to the device punch remove that session's adjustment.
+export function adjustDay(data, { office, acNo, date, am, pm, reason }, at) {
+  if (!Object.hasOwn(data.employees, `${office}|${acNo}`)) throw new Error('Unknown employee');
+  if (!isIsoDate(date)) throw new Error('Invalid date');
+  const sessions = { AM: am ?? {}, PM: pm ?? {} };
+  for (const [s, v] of Object.entries(sessions)) {
+    for (const t of [v.in ?? '', v.out ?? '']) if (t !== '' && !HHMM.test(t)) throw new Error(`Invalid time: ${t}`);
+    if (v.in && v.out && v.out <= v.in) throw new Error(`${s === 'AM' ? 'A.M.' : 'P.M.'} departure must be later than arrival`);
+  }
+  const next = { ...(data.adjustments ?? {}) };
+  let changed = false;
+  for (const [s, v] of Object.entries(sessions)) {
+    const key = `${office}|${acNo}|${date}|${s}`;
+    const device = data.punches[key];
+    const value = { in: v.in ?? '', out: v.out ?? '' };
+    if (value.in === (device?.in ?? '') && value.out === (device?.out ?? '')) {
+      delete next[key];
+      continue;
+    }
+    changed = true;
+    const [onDuty, offDuty] = device ? [device.onDuty, device.offDuty] : sessionHours(data, office, acNo, s);
+    next[key] = { ...value, onDuty, offDuty, reason: String(reason ?? '').trim(), at };
+  }
+  if (changed) {
+    const r = String(reason ?? '').trim();
+    if (!r) throw new Error('Reason is required');
+    if (r.length > 200) throw new Error('Reason is too long (max 200 characters)');
+  }
+  data.adjustments = next;
+}
+
+export function revertDay(data, { office, acNo, date }) {
+  const keys = ['AM', 'PM'].map((s) => `${office}|${acNo}|${date}|${s}`).filter((k) => Object.hasOwn(data.adjustments ?? {}, k));
+  if (!keys.length) throw new Error(`No adjustment on ${date}`);
+  const next = { ...data.adjustments };
+  keys.forEach((k) => delete next[k]);
+  data.adjustments = next;
 }
