@@ -1,0 +1,48 @@
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --text: #1d2330;
+  --muted: #6b7280;
+  --border: #d9dce1;
+  --accent: #1f5fbf;
+  --accent-soft: #e6eefb;
+  --danger: #b42318;
+  --ok: #1a7f37;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+button { font: inherit; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button:disabled { opacity: 0.6; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.link { border: 0; background: none; padding: 0 4px; font-size: 18px; line-height: 1; }
+input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.muted { color: var(--muted); }
+.err { color: var(--danger); }
+.ok { color: var(--ok); }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.topbar h1 { font-size: 16px; margin: 0; }
+.results { position: relative; padding: 8px 40px 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.results .link { position: absolute; top: 6px; right: 12px; }
+.body { flex: 1; display: flex; min-height: 0; }
+.sidebar { width: 300px; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--border); padding: 12px; }
+.sidebar ul { list-style: none; margin: 0 0 12px; padding: 0; }
+.office-head { display: flex; align-items: baseline; justify-content: space-between; }
+.office-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 4px; }
+.emp { width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; border: 0; background: none; padding: 6px 8px; }
+.emp:hover { background: var(--bg); }
+.emp.active { background: var(--accent-soft); }
+.preview { flex: 1; overflow: auto; padding: 16px; }
+
+.backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }
+.dialog { background: var(--panel); border-radius: 8px; padding: 20px; width: 460px; max-width: calc(100% - 32px); }
+.dialog h2 { margin: 0 0 4px; font-size: 16px; }
+.file-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-row input { width: 180px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
