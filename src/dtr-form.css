@@ -1,0 +1,66 @@
+/* CS Form 48, one copy per A4 page. Proportions follow the docx template grid
+   (468 : 720 x5 : 540 twips), scaled to fit the page content area. */
+@page { size: A4 portrait; margin: 0.5in 0.7in; }
+
+.page {
+  width: 8.27in;
+  height: 11.69in;
+  padding: 0.5in 0.7in;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.dtr-form {
+  width: 5.6in;
+  height: 10.69in;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10pt;
+  color: #000;
+}
+.dtr-form p { margin: 0; }
+.dtr-form .csf { font-style: italic; font-size: 9pt; }
+.dtr-form .title { font-size: 15pt; font-weight: bold; text-align: center; margin: 8pt 0 0; }
+.dtr-form .divider { text-align: center; font-size: 9pt; }
+.dtr-form .name-line {
+  margin: 10pt 0.3in 0;
+  min-height: 1.4em;
+  border-bottom: 1px solid #000;
+  text-align: center;
+  font-weight: bold;
+  font-size: 13pt;
+}
+.dtr-form .caption { text-align: center; font-size: 9pt; }
+
+.dtr-form .meta { width: 100%; border-collapse: collapse; margin: 6pt 0 8pt; font-size: 9pt; font-style: italic; }
+.dtr-form .meta td { padding: 2pt 4pt; vertical-align: bottom; }
+.dtr-form .meta .label { white-space: nowrap; width: 1%; }
+.dtr-form .meta .right { text-align: right; }
+.dtr-form .meta .line { border-bottom: 1px solid #000; font-style: normal; text-align: center; }
+.dtr-form .meta .official { width: 38%; text-align: center; vertical-align: middle; }
+
+.dtr-form .grid { flex: 1; width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid #000; }
+.dtr-form .grid th,
+.dtr-form .grid td { border: 1px solid #000; text-align: center; padding: 0 2pt; font-size: 10pt; }
+.dtr-form .grid th { font-weight: normal; font-size: 9pt; }
+.dtr-form .grid th.group { font-weight: bold; font-size: 10pt; }
+.dtr-form .grid tr.sub th { font-size: 8pt; line-height: 1.1; }
+.dtr-form .grid .sep { border-right-width: 2px; }
+.dtr-form .grid tbody td { height: 1.5em; }
+.dtr-form .grid .total-line { display: flex; justify-content: space-between; align-items: center; padding: 0 4pt; font-size: 9pt; }
+.dtr-form .grid .total-line .days { font-weight: bold; font-size: 10pt; }
+
+.dtr-form .certify { font-style: italic; font-size: 9pt; margin-top: 8pt; text-align: justify; }
+.dtr-form .sign-line {
+  margin: 24pt 0.3in 0;
+  min-height: 1.4em;
+  border-bottom: 1px solid #000;
+  text-align: center;
+  font-weight: bold;
+  font-size: 12pt;
+}
+.dtr-form .verified { font-style: italic; font-size: 9pt; margin-top: 12pt; }
+.dtr-form .in-charge { font-style: italic; }

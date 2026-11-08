@@ -1,5 +1,62 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
+import DtrForm from './DtrForm.jsx';
+import { computeDtr, formatTime, periodLabel } from './lib/dtr.js';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December'];
+const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
+
+function Preview({ data, employee }) {
+  const punches = useMemo(() => {
+    const prefix = `${employee.office}|${employee.acNo}|`;
+    return Object.entries(data.punches).filter(([k]) => k.startsWith(prefix)).map(([, p]) => p);
+  }, [data, employee]);
+
+  const latest = punches.reduce((max, p) => (p.date > max ? p.date : max), '');
+  const today = new Date();
+  const [year, setYear] = useState(latest ? Number(latest.slice(0, 4)) : today.getFullYear());
+  const [month, setMonth] = useState(latest ? Number(latest.slice(5, 7)) : today.getMonth() + 1);
+  const [half, setHalf] = useState('full');
+
+  const graceMinutes = data.offices[employee.office]?.graceMinutes ?? 15;
+  const result = computeDtr({ punches, year, month, half, graceMinutes });
+  const am = punches.find((p) => p.session === 'AM');
+  const pm = punches.find((p) => p.session === 'PM');
+  const officialHours = [am, pm].filter(Boolean)
+    .map((p) => `${formatTime(p.onDuty)}-${formatTime(p.offDuty)}`).join(', ');
+
+  return (
+    <>
+      <div className="controls">
+        <label>
+          Month{' '}
+          <select aria-label="Month" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+        </label>
+        <label>
+          Year{' '}
+          <input aria-label="Year" type="number" min="2000" max="2100" value={year}
+            onChange={(e) => e.target.value && setYear(Number(e.target.value))} />
+        </label>
+        <fieldset className="halves">
+          <legend className="sr-only">Period</legend>
+          {HALVES.map(([value, label]) => (
+            <label key={value}>
+              <input type="radio" name="half" value={value} checked={half === value} onChange={() => setHalf(value)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      </div>
+      <div className="page">
+        <DtrForm name={employee.name} periodText={periodLabel(year, month, half)}
+          officialHours={officialHours} half={half} result={result} />
+      </div>
+    </>
+  );
+}
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -22,6 +79,8 @@ export default function App() {
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
     }));
   }, [data]);
+
+  const employee = data && selected ? data.employees[selected] : null;
 
   const pick = async () => {
     const paths = await window.api.pickExcelFiles();
@@ -95,7 +154,11 @@ export default function App() {
           ))}
         </nav>
         <main className="preview">
-          <p className="muted">Select an employee to preview their DTR.</p>
+          {employee ? (
+            <Preview key={selected} data={data} employee={employee} />
+          ) : (
+            <p className="muted">Select an employee to preview their DTR.</p>
+          )}
         </main>
       </div>
 
