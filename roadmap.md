@@ -29,18 +29,38 @@ Conventions later phases inherit:
 - Layout is one DTR per A4 page, with no instructions page (confirmed 2026-11-08).
 - E2E tests follow `.claude/skills/e2e-testing/SKILL.md`, with hand-derived expected values and a mutation check for each assertion.
 
-### Phase 1 — Print, PDF, office settings NEXT
+### Phase 1 — Print, PDF, office settings ✅ DONE (merged `dcc1cac`, 2026-11-08)
 
 Covers US-4, US-5.
 
 - Print and export a one-page A4 PDF for one employee or a whole office
 - Per-office in-charge name and grace minutes, with a per-print override for the in-charge name
 
-**Done when:** an exported PDF is one A4 page that matches the preview and shows the office's in-charge name.
+**Done when:** an exported PDF is one A4 page that matches the preview and shows the office's in-charge name. — **Verified** on 2026-11-08 with Playwright `_electron` and Vitest: 44/44 unit, 5/5 E2E. Checked:
+- PDF page count and A4 size (1 page per employee, 11 for HRMO), with the PDF rendered and viewed
+- print options, no app UI in print
+- cancelled and failed saves
+- in-charge and grace settings persisting, and the one-print override not saving
+
+Results: `PHASE-1-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/store.js`: `updateOffice`.
+- `src/lib/dtr.js`: `officialHours`.
+- `electron/main.js`: IPC `update-office`, `print`, `export-pdf`.
+- React UI: `src/OfficeDialog.jsx`, plus print and export actions and the `.print-batch` office render in `src/App.jsx`.
+- Print CSS in `src/app.css` and `src/dtr-form.css`.
 
 Deliberately not built, and why: holidays (Phase 2), adjustments (Phase 3).
 
-### Phase 2 — Holidays and weekends LATER
+Conventions later phases inherit:
+- Anything that must print goes inside a `.page` box. Print CSS hides all other UI.
+- Multi-page jobs render into `.print-batch` and then call `print` or `export-pdf` once.
+- Main writes only to paths from its own dialogs.
+- Status messages go through `onNotice([{ ok, text }])`. IPC errors are shown with `ipcError(e)`.
+- E2E temp folders come only from `tmpDir()`, which global teardown deletes.
+
+### Phase 2 — Holidays and weekends NEXT
 
 Covers US-6.
 
