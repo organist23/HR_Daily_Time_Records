@@ -7,10 +7,10 @@
 Proves the core loop: Excel file → stored locally → computed DTR shown on screen, in Electron + React.
 Covers US-1, US-2, US-3.
 
-- Admin imports HRMO.xls (and other files) and tags each with an office
+- Admin imports HRMO (3).xls (and other files) and tags each with an office
 - Clicking an employee shows their computed single-copy DTR for a month or half-month
 
-**Done when:** importing `sample_data/HRMO.xls` lists 11 employees under HRMO, the data survives a restart, and the July 1–15, 2026 DTRs show the US-2 example values.
+**Done when:** importing `sample_data/HRMO (3).xls` lists 11 employees under HRMO, the data survives a restart, and the July 1–15, 2026 DTRs show the US-2 example values.
 
 Deliberately not built, and why: print/PDF (Phase 1), in-charge settings (Phase 1), holidays and weekend labels (Phase 2), time adjustments (Phase 3), search and filters (Phase 4), archive and backup (Phase 5).
 

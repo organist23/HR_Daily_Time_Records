@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import { computeDtr, formatTime, periodLabel } from '../src/lib/dtr.js';
 
-const all = parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO.xls'))).records;
+const all = parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const of = (acNo) => all.filter((r) => r.acNo === acNo);
 const july = (acNo, half = 'first', graceMinutes = 15) =>
   computeDtr({ punches: of(acNo), year: 2026, month: 7, half, graceMinutes });

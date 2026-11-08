@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import * as XLSX from 'xlsx';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 
-const hrmoRows = () => readSheetRows(fs.readFileSync('sample_data/HRMO.xls'));
+const hrmoRows = () => readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'));
 const find = (records, acNo, date, session) =>
   records.find((r) => r.acNo === acNo && r.date === date && r.session === session);
 
 describe('parseRows', () => {
-  it('parses HRMO.xls', () => {
+  it('parses HRMO (3).xls', () => {
     const { records, skipped } = parseRows(hrmoRows());
     expect(records).toHaveLength(154);
     expect(skipped).toBe(0);

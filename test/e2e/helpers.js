@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-e2e-'));
-export const HRMO = path.resolve('sample_data/HRMO.xls');
+export const HRMO = path.resolve('sample_data/HRMO (3).xls');
 
 export async function launch(dataDir) {
   const env = { ...process.env, DTR_DATA_DIR: dataDir };

@@ -6,8 +6,8 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 ## Assumptions
 - Single admin user on one Windows PC. No login, no server, no database server.
 - Stack: Electron, React (Vite), SheetJS for Excel parsing. Data stored as JSON files in the app's user data folder.
-- All offices' devices export the same columns as `sample_data/HRMO.xls`: `AC-No., Name, Date, Timetable, On duty, Off duty, Clock In, Clock Out, Late, Early, Absent`. Every cell is text. Dates are `M/DD/YYYY` and times are 24h `HH:MM`. There are two rows per employee per day (`Morning`, `Afternoon`).
-- `HRMO.xls` is in Excel 2.1 (BIFF2) format. `.xls` (any BIFF version) and `.xlsx` must both import.
+- All offices' devices export the same columns as `sample_data/HRMO (3).xls`: `AC-No., Name, Date, Timetable, On duty, Off duty, Clock In, Clock Out, Late, Early, Absent`. Every cell is text. Dates are `M/DD/YYYY` and times are 24h `HH:MM`. There are two rows per employee per day (`Morning`, `Afternoon`).
+- `HRMO (3).xls` is in Excel 2.1 (BIFF2) format. `.xls` (any BIFF version) and `.xlsx` must both import.
 - Employee identity = office + AC-No.
 - The device's `Late`, `Early`, and `Absent` columns are ignored. The app computes them (the device reports a missing punch as `01:00`, which is wrong).
 - Only regular employees with Morning/Afternoon sessions are supported. Shift workers are out of scope.
@@ -18,7 +18,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Displayed times** are 12h `h:mm` without AM/PM (13:02 → `1:02`), as in the reference photo.
 - **Late**: if arrival is later than on-duty + grace, late = arrival − on-duty in full minutes. Otherwise 0.
   - Grace is set per office and defaults to 15 minutes.
-  - Evidence from HRMO.xls: 8:08 and 13:06 were not marked late, and 8:18 was marked 18 minutes late. So the device grace is between 9 and 17 minutes, with lateness counted from 8:00 once the grace is exceeded.
+  - Evidence from HRMO (3).xls: 8:08 and 13:06 were not marked late, and 8:18 was marked 18 minutes late. So the device grace is between 9 and 17 minutes, with lateness counted from 8:00 once the grace is exceeded.
   - The CSC has no legal grace period, so the office can set it to 0.
 - **Early departure**: if departure is earlier than off-duty, early = off-duty − departure. There is no grace.
 - **One punch missing in a session** (arrival only or departure only): that session's undertime = full session length (4h).
@@ -34,9 +34,9 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 **As** admin, **I want** to select one or more Excel files and assign each to an office, **so that** punches are stored locally under the right office.
 
 **Accepts when:**
-- [ ] Admin can select multiple `.xls`/`.xlsx` files in one import, including the BIFF2 `HRMO.xls`.
-- [ ] Each file's office defaults to its file name without extension (`HRMO.xls` → `HRMO`) and can be changed to a new or existing office before saving.
-- [ ] After import, employees appear under the office with AC-No and name. HRMO.xls yields 11 employees.
+- [ ] Admin can select multiple `.xls`/`.xlsx` files in one import, including the BIFF2 `HRMO (3).xls`.
+- [ ] Each file's office defaults to its file name without extension (`HRMO (3).xls` → `HRMO (3)`) and can be changed to a new or existing office before saving.
+- [ ] After import, employees appear under the office with AC-No and name. HRMO (3).xls yields 11 employees.
 - [ ] Imported data is still there after the app is closed and reopened.
 - [ ] Re-importing a file with rows already stored (same office, AC-No, date, session) updates those rows and creates no duplicates.
 

@@ -32,7 +32,7 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 
 ## Fixtures
 
-- **Captured, not invented.** `sample_data/HRMO.xls` is a real device export (BIFF2, 11 employees,
+- **Captured, not invented.** `sample_data/HRMO (3).xls` is a real device export (BIFF2, 11 employees,
   154 rows, July 1–9 2026). It is committed on purpose. Use it for every happy path.
 - **Bad inputs are derived from the captured file**, not typed from scratch. Example: the
   missing-column file is HRMO rows with `Clock Out` removed, written as `.xlsx` with SheetJS.
@@ -80,6 +80,6 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 |---|---|
 | `Process failed to launch!` | `ELECTRON_RUN_AS_NODE` still in the env. Launch through `helpers.launch` |
 | Test passes but the UI change is not visible | `dist/` is stale. Run `npm run test:e2e`, not `npx playwright test`, after renderer edits |
-| `Cannot access file ... HRMO.xls` | `XLSX.readFile` used in the ESM test. Read the buffer with `fs` |
+| `Cannot access file ... HRMO (3).xls` | `XLSX.readFile` used in the ESM test. Read the buffer with `fs` |
 | Employees from an earlier run appear | `DTR_DATA_DIR` was not set, or a temp folder was reused across tests |
 | A success line matches an error assertion | Assert on the `.err` line (`status.locator('.err', { hasText })`), not on the file name alone |

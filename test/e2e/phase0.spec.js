@@ -11,9 +11,10 @@ test('US-1 import per office, persist, re-import, bad files', async () => {
   await expect(page.getByText('No records yet. Import an Excel file to start.')).toBeVisible();
 
   let dlg = await importFiles(app, page, [HRMO]);
-  await expect(dlg.getByLabel('Office for HRMO.xls')).toHaveValue('HRMO');
+  await expect(dlg.getByLabel('Office for HRMO (3).xls')).toHaveValue('HRMO (3)');
+  await dlg.getByLabel('Office for HRMO (3).xls').fill('HRMO');
   await dlg.getByRole('button', { name: 'Import' }).click();
-  await expect(page.getByRole('status')).toContainText('HRMO.xls: 154 added, 0 updated, 0 skipped');
+  await expect(page.getByRole('status')).toContainText('HRMO (3).xls: 154 added, 0 updated, 0 skipped');
   await expect(page.getByRole('heading', { name: 'HRMO' })).toBeVisible();
   await expect(employeeButtons(page)).toHaveCount(11);
 
@@ -22,8 +23,9 @@ test('US-1 import per office, persist, re-import, bad files', async () => {
   await expect(employeeButtons(page)).toHaveCount(11);
 
   dlg = await importFiles(app, page, [HRMO]);
+  await dlg.getByLabel('Office for HRMO (3).xls').fill('hrmo'); // matches existing office case-insensitively
   await dlg.getByRole('button', { name: 'Import' }).click();
-  await expect(page.getByRole('status')).toContainText('HRMO.xls: 0 added, 154 updated, 0 skipped');
+  await expect(page.getByRole('status')).toContainText('HRMO (3).xls: 0 added, 154 updated, 0 skipped');
   await expect(employeeButtons(page)).toHaveCount(11);
 
   const bad = path.join(tmpDir(), 'bad.xls');
@@ -35,11 +37,12 @@ test('US-1 import per office, persist, re-import, bad files', async () => {
   fs.writeFileSync(noOut, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
   dlg = await importFiles(app, page, [bad, HRMO, noOut]);
+  await dlg.getByLabel('Office for HRMO (3).xls').fill('HRMO');
   await dlg.getByLabel('Office for noout.xlsx').fill('Accounting');
   await dlg.getByRole('button', { name: 'Import' }).click();
   const status = page.getByRole('status');
   await expect(status.locator('.err', { hasText: 'bad.xls:' })).toHaveCount(1);
-  await expect(status).toContainText('HRMO.xls: 0 added, 154 updated');
+  await expect(status).toContainText('HRMO (3).xls: 0 added, 154 updated');
   await expect(status).toContainText('noout.xlsx: Missing columns: Clock Out');
   await expect(employeeButtons(page)).toHaveCount(11);
   await expect(page.getByRole('heading', { name: 'Accounting' })).toHaveCount(0);

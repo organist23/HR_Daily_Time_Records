@@ -46,7 +46,7 @@ Fill in per project. `feature-workflow` reads these.
 
 - Project: Electron + React (Vite) desktop app that turns biometric Excel exports into CS Form 48 DTRs. Spec: `spec.md`. Phases: `roadmap.md`.
 - Stack: Electron, React, Vite, SheetJS (`xlsx`) for `.xls`/`.xlsx` parsing. Storage: JSON files in Electron `app.getPath('userData')`. No server, no database server.
-- Reference files: `sample_data/HRMO.xls` (raw device export, BIFF2), `sample_data/Appendix-24-Daily-Time-Record-DTR (1).docx` (print template, single copy per A4 page), `sample_data/actual_raw_hand_writtern_dtr.jpg` (filled example).
+- Reference files: `sample_data/HRMO (3).xls` (raw device export, BIFF2), `sample_data/Appendix-24-Daily-Time-Record-DTR (1).docx` (print template, single copy per A4 page), `sample_data/actual_raw_hand_writtern_dtr.jpg` (filled example).
 - Trust boundaries (step 10 runs `/security-review` when a diff touches these): Excel file import (untrusted file parsing), backup restore (untrusted file input), file system writes (data folder, PDF export, backup), Electron IPC and preload bridge (`contextIsolation` on, `nodeIntegration` off).
 - UI test driver (step 8, only if not `claude-in-chrome`): Playwright (`_electron` launch).
 - Test command: `npm test` (Vitest unit tests), `npm run test:e2e` (Playwright Electron E2E).

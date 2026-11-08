@@ -5,7 +5,7 @@ import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import { emptyData, resolveOffice, mergeImport, loadData, saveData } from '../src/lib/store.js';
 
-const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO.xls'))).records;
+const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-'));
 
 describe('mergeImport', () => {
