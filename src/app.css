@@ -48,7 +48,7 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 /* Print and PDF: only DTR pages. An office batch replaces the on-screen page. */
 @media print {
   body, .app, .body, .preview { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; }
-  .topbar, .results, .sidebar, .controls, .backdrop, .empty-hint, .holidays { display: none !important; }
+  .topbar, .results, .sidebar, .controls, .hint, .backdrop, .empty-hint, .holidays { display: none !important; }
   .print-batch { display: block; }
   .preview:has(.print-batch) .main-page { display: none; }
 }
@@ -68,6 +68,9 @@ button.danger { color: var(--danger); border-color: var(--danger); }
 .holiday-list h2 { font-size: 14px; margin: 0 0 8px; }
 .holiday-list ul { list-style: none; margin: 0; padding: 0; }
 .holiday-list li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.hint { width: 8.27in; margin: 0 auto 8px; font-size: 12px; }
+.time-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+.time-grid .field { margin: 6px 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }
