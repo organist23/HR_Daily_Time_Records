@@ -242,6 +242,33 @@ describe('time adjustments', () => {
     expect(data.adjustments ?? {}).toEqual({});
   });
 
+  it('keeps the reason and time of a session that was not changed', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    const later = '2026-11-10T02:00:00.000Z';
+    adjustDay(data, { ...wfh, pm: { in: '13:00', out: '16:00' }, reason: 'Left early, approved' }, later);
+    expect(data.adjustments['HRMO|568|2026-07-01|AM']).toMatchObject({ reason: 'Work from home', at: AT });
+    expect(data.adjustments['HRMO|568|2026-07-01|PM']).toMatchObject({ out: '16:00', reason: 'Left early, approved', at: later });
+  });
+
+  it('rejects an A.M. departure later than the P.M. arrival', () => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, am: { in: '08:00', out: '14:00' } }, AT)).toThrow('A.M. departure must not be later than P.M. arrival');
+  });
+
+  it('rejects non-string times', () => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, am: { in: ['08:00'], out: '12:00' } }, AT)).toThrow(/Invalid time/);
+  });
+
+  it('uses the nearest dated punch for official hours', () => {
+    const data = emptyData();
+    const p = (date, onDuty, offDuty) => ({ acNo: '1', name: 'X', date, session: 'AM', onDuty, offDuty, in: onDuty, out: offDuty });
+    mergeImport(data, 'HR', [p('2026-01-05', '07:30', '11:30'), p('2026-07-06', '08:00', '12:00')]);
+    adjustDay(data, { office: 'HR', acNo: '1', date: '2026-07-13', am: { in: '08:00', out: '12:00' }, pm: {}, reason: 'WFH' }, AT);
+    expect(data.adjustments['HR|1|2026-07-13|AM']).toMatchObject({ onDuty: '08:00', offDuty: '12:00' });
+  });
+
   it('takes official hours from other punches for a day with no device rows', () => {
     const data = ronie();
     adjustDay(data, { ...wfh, date: '2026-07-13' }, AT);

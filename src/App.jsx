@@ -28,7 +28,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
     [device, adjustments, employee],
   );
 
-  const latest = punches.reduce((max, p) => (p.date > max ? p.date : max), '');
+  const latest = device.reduce((max, p) => (p.date > max ? p.date : max), ''); // last imported date, not an adjustment
   const today = new Date();
   const [year, setYear] = useState(latest ? Number(latest.slice(0, 4)) : today.getFullYear());
   const [yearText, setYearText] = useState(String(year)); // year applies only once 4 digits are typed
@@ -133,11 +133,19 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       if (!byEmployee.has(p.acNo)) byEmployee.set(p.acNo, []);
       byEmployee.get(p.acNo).push(p);
     }
+    const adjByEmployee = new Map(); // acNo -> that employee's adjustments
+    const officePrefix = `${employee.office}|`;
+    for (const [k, a] of Object.entries(adjustments)) {
+      if (!k.startsWith(officePrefix)) continue;
+      const acNo = k.slice(officePrefix.length).split('|')[0];
+      if (!adjByEmployee.has(acNo)) adjByEmployee.set(acNo, {});
+      adjByEmployee.get(acNo)[k] = a;
+    }
     return Object.values(data.employees)
       .filter((e) => e.office === employee.office)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
-        const p = effectivePunches(byEmployee.get(e.acNo) ?? [], adjustments, e.office, e.acNo);
+        const p = effectivePunches(byEmployee.get(e.acNo) ?? [], adjByEmployee.get(e.acNo), e.office, e.acNo);
         return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes, holidays }) };
       });
   }, [batch, data, employee.office, year, month, half, graceMinutes, holidays, adjustments]);

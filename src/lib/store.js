@@ -84,41 +84,51 @@ export function deleteHoliday(data, date) {
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DEFAULT_HOURS = { AM: ['08:00', '12:00'], PM: ['13:00', '17:00'] };
+const dayNumber = (iso) => Date.parse(`${iso}T00:00:00Z`) / 86400000;
 
-// Session hours for a day without a device row: the employee's other punches, else 8-12 / 1-5.
-function sessionHours(data, office, acNo, session) {
+// Session hours for a day without a device row: the employee's nearest-dated punch, else 8-12 / 1-5.
+function sessionHours(data, office, acNo, session, date) {
   const prefix = `${office}|${acNo}|`;
-  const p = Object.entries(data.punches).find(([k, v]) => k.startsWith(prefix) && v.session === session)?.[1];
-  return p ? [p.onDuty, p.offDuty] : DEFAULT_HOURS[session];
+  let best = null;
+  for (const [k, p] of Object.entries(data.punches)) {
+    if (!k.startsWith(prefix) || p.session !== session) continue;
+    const gap = Math.abs(dayNumber(p.date) - dayNumber(date));
+    if (!best || gap < best.gap) best = { gap, p };
+  }
+  return best ? [best.p.onDuty, best.p.offDuty] : DEFAULT_HOURS[session];
 }
 
-// Sets both sessions of one day. Values equal to the device punch remove that session's adjustment.
+// Sets both sessions of one day. A session equal to the device punch drops its adjustment;
+// a session equal to its stored adjustment keeps that record (reason and time) unchanged.
 export function adjustDay(data, { office, acNo, date, am, pm, reason }, at) {
   if (!Object.hasOwn(data.employees, `${office}|${acNo}`)) throw new Error('Unknown employee');
   if (!isIsoDate(date)) throw new Error('Invalid date');
   const sessions = { AM: am ?? {}, PM: pm ?? {} };
   for (const [s, v] of Object.entries(sessions)) {
-    for (const t of [v.in ?? '', v.out ?? '']) if (t !== '' && !HHMM.test(t)) throw new Error(`Invalid time: ${t}`);
+    for (const t of [v.in ?? '', v.out ?? '']) {
+      if (typeof t !== 'string' || (t !== '' && !HHMM.test(t))) throw new Error(`Invalid time: ${t}`);
+    }
     if (v.in && v.out && v.out <= v.in) throw new Error(`${s === 'AM' ? 'A.M.' : 'P.M.'} departure must be later than arrival`);
   }
+  const amOut = sessions.AM.out || sessions.AM.in;
+  const pmIn = sessions.PM.in || sessions.PM.out;
+  if (amOut && pmIn && amOut > pmIn) throw new Error('A.M. departure must not be later than P.M. arrival');
+  const why = String(reason ?? '').trim();
+  if (why.length > 200) throw new Error('Reason is too long (max 200 characters)');
+
   const next = { ...(data.adjustments ?? {}) };
-  let changed = false;
   for (const [s, v] of Object.entries(sessions)) {
     const key = `${office}|${acNo}|${date}|${s}`;
     const device = data.punches[key];
     const value = { in: v.in ?? '', out: v.out ?? '' };
-    if (value.in === (device?.in ?? '') && value.out === (device?.out ?? '')) {
-      delete next[key];
-      continue;
+    const stored = next[key];
+    if (value.in === (device?.in ?? '') && value.out === (device?.out ?? '')) delete next[key];
+    else if (stored && stored.in === value.in && stored.out === value.out) continue;
+    else {
+      if (!why) throw new Error('Reason is required');
+      const [onDuty, offDuty] = device ? [device.onDuty, device.offDuty] : sessionHours(data, office, acNo, s, date);
+      next[key] = { ...value, onDuty, offDuty, reason: why, at };
     }
-    changed = true;
-    const [onDuty, offDuty] = device ? [device.onDuty, device.offDuty] : sessionHours(data, office, acNo, s);
-    next[key] = { ...value, onDuty, offDuty, reason: String(reason ?? '').trim(), at };
-  }
-  if (changed) {
-    const r = String(reason ?? '').trim();
-    if (!r) throw new Error('Reason is required');
-    if (r.length > 200) throw new Error('Reason is too long (max 200 characters)');
   }
   data.adjustments = next;
 }

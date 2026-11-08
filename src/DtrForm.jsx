@@ -6,7 +6,7 @@ const mins = (min) => (min ? String(min % 60) : '');
 
 // onDayClick (app view only) makes day numbers buttons; dayName(day) gives their label, e.g. "July 1, 2026".
 export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName }) {
-  const cell = (r, key) => (r.adjusted.includes(key) ? 'adjusted' : undefined);
+  const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted'].filter(Boolean).join(' ') || undefined;
   // The form keeps the template's printed rows (16-31 even in a 30-day month).
   // computeDtr already blanks days outside the period, so only the half is chosen here.
   const rows = result.rows.filter((r) => (half === 'first' ? r.day <= 15 : half === 'second' ? r.day >= 16 : true));
@@ -75,10 +75,10 @@ export default function DtrForm({ name, periodText, officialHours, half, result,
                 <td colSpan={4} className="label-cell sep">{r.label}</td>
               ) : (
                 <>
-                  <td className={cell(r, 'amIn')}>{r.amIn}</td>
-                  <td className={['sep', cell(r, 'amOut')].filter(Boolean).join(' ')}>{r.amOut}</td>
-                  <td className={cell(r, 'pmIn')}>{r.pmIn}</td>
-                  <td className={['sep', cell(r, 'pmOut')].filter(Boolean).join(' ')}>{r.pmOut}</td>
+                  <td className={cls(r, 'amIn')}>{r.amIn}</td>
+                  <td className={cls(r, 'amOut', 'sep')}>{r.amOut}</td>
+                  <td className={cls(r, 'pmIn')}>{r.pmIn}</td>
+                  <td className={cls(r, 'pmOut', 'sep')}>{r.pmOut}</td>
                 </>
               )}
               <td>{hours(r.undertime)}</td>
