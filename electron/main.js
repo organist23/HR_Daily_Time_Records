@@ -91,7 +91,8 @@ ipcMain.handle('print', (event) => new Promise((resolve) => {
 // Writes only to the path the admin picks in the save dialog.
 ipcMain.handle('export-pdf', async (event, suggestedName) => {
   const win = windowOf(event);
-  const name = path.basename(String(suggestedName || 'DTR.pdf')).replace(/[\\/:*?"<>|]/g, '');
+  // Replace path and reserved characters first, so a name like "HR/Admin" stays whole.
+  const name = String(suggestedName || 'DTR.pdf').replace(/[\\/:*?"<>|]/g, '-');
   const res = await dialog.showSaveDialog(win, {
     defaultPath: path.join(app.getPath('documents'), name),
     filters: [{ name: 'PDF', extensions: ['pdf'] }],

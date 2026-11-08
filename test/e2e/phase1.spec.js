@@ -30,6 +30,13 @@ test('US-5 in-charge name and grace per office, one-print override', async () =>
   await page.getByLabel('In charge (this print)').fill('JUAN DELA CRUZ');
   await expect(inChargeLine).toHaveText('JUAN DELA CRUZ');
 
+  // Saving settings without changing the in-charge name keeps the one-print override.
+  await page.getByRole('button', { name: 'Office settings' }).click();
+  await od.getByLabel('Grace minutes').fill('0');
+  await od.getByRole('button', { name: 'Save' }).click();
+  await expect(od).toHaveCount(0);
+  await expect(inChargeLine).toHaveText('JUAN DELA CRUZ');
+
   await page.getByRole('button', { name: 'Office settings' }).click();
   await expect(od.getByLabel('In-charge name')).toHaveValue('MARIVIC P. SARINAS');
   await od.getByLabel('Grace minutes').fill('-5');

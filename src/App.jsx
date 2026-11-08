@@ -7,7 +7,7 @@ import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
 // Electron prefixes errors thrown in main; show only the message.
-const ipcError = (e) => e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+const ipcError = (e) => String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
 const punchesOf = (data, emp) => {
   const prefix = `${emp.office}|${emp.acNo}|`;
@@ -43,7 +43,8 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       throw new Error(ipcError(e));
     }
     onDataChange(next);
-    setInCharge(next.offices[employee.office].inCharge);
+    // Follow the saved name only when it changed; otherwise keep a typed one-print override.
+    if (next.offices[employee.office].inCharge !== (settings.inCharge ?? '')) setInCharge(next.offices[employee.office].inCharge);
     setEditing(false);
   };
 
@@ -71,15 +72,23 @@ function Preview({ data, employee, onDataChange, onNotice }) {
     job(batch.kind, batch.name).finally(() => setBatch(null));
   }, [batch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const officePages = batch
-    ? Object.values(data.employees)
+  // One pass over all punches per batch, grouped by employee.
+  const officePages = useMemo(() => {
+    if (!batch) return [];
+    const byEmployee = new Map();
+    for (const p of Object.values(data.punches)) {
+      if (p.office !== employee.office) continue;
+      if (!byEmployee.has(p.acNo)) byEmployee.set(p.acNo, []);
+      byEmployee.get(p.acNo).push(p);
+    }
+    return Object.values(data.employees)
       .filter((e) => e.office === employee.office)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
-        const p = punchesOf(data, e);
+        const p = byEmployee.get(e.acNo) ?? [];
         return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes }) };
-      })
-    : [];
+      });
+  }, [batch, data, employee.office, year, month, half, graceMinutes]);
 
   return (
     <>
