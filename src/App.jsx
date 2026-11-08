@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
+import HolidaysView from './HolidaysView.jsx';
 import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
@@ -172,6 +173,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
+  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
@@ -196,6 +198,15 @@ export default function App() {
 
   const cancel = useCallback(() => setPending(null), []);
 
+  // Holiday changes go through main; errors come back as plain messages for the dialog.
+  const holidayCall = async (call) => {
+    try {
+      setData(await call());
+    } catch (e) {
+      throw new Error(ipcError(e));
+    }
+  };
+
   const runImport = async (items) => {
     setPending(null);
     setBusy(true);
@@ -219,9 +230,14 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1>Employees DTR Analyzer</h1>
-        <button className="primary" onClick={pick} disabled={busy || !data}>
-          {busy ? 'Importing…' : 'Import Excel'}
-        </button>
+        <div className="top-actions">
+          <button onClick={() => setView(view === 'dtr' ? 'holidays' : 'dtr')} disabled={!data}>
+            {view === 'dtr' ? 'Holidays' : 'DTR preview'}
+          </button>
+          <button className="primary" onClick={pick} disabled={busy || !data}>
+            {busy ? 'Importing…' : 'Import Excel'}
+          </button>
+        </div>
       </header>
 
       {messages && (
@@ -248,7 +264,10 @@ export default function App() {
                     <button
                       className={selected === e.key ? 'emp active' : 'emp'}
                       aria-pressed={selected === e.key}
-                      onClick={() => setSelected(e.key)}
+                      onClick={() => {
+                        setSelected(e.key);
+                        setView('dtr');
+                      }}
                     >
                       <span>{e.name}</span>
                       <span className="muted">#{e.acNo}</span>
@@ -260,7 +279,13 @@ export default function App() {
           ))}
         </nav>
         <main className="preview">
-          {employee ? (
+          {view === 'holidays' && data ? (
+            <HolidaysView
+              holidays={data.holidays ?? {}}
+              onSave={(h, originalDate) => holidayCall(() => window.api.saveHoliday(h, originalDate))}
+              onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
+            />
+          ) : employee ? (
             <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
           ) : (
             <p className="muted">Select an employee to preview their DTR.</p>

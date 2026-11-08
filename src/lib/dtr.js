@@ -1,3 +1,5 @@
+export const HOLIDAY_TYPES = ['Regular Holiday', 'Special Non-Working Holiday', 'Local Holiday', 'Work Suspension'];
+
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'];
 

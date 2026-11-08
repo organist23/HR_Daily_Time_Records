@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { loadData, saveData, mergeImport, resolveOffice, updateOffice } from '../src/lib/store.js';
+import { loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday } from '../src/lib/store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
@@ -70,14 +70,20 @@ app.on('second-instance', () => {
   }
 });
 
-ipcMain.handle('update-office', (_event, office, patch) => {
+// Applies a change to a copy, saves it, and only then makes it the current data.
+function mutate(change) {
   if (loadError) throw new Error(loadError);
   const next = structuredClone(data);
-  updateOffice(next, String(office), patch ?? {});
+  change(next);
   saveData(dataDir, next);
   data = next;
   return data;
-});
+}
+
+ipcMain.handle('update-office', (_event, office, patch) => mutate((d) => updateOffice(d, String(office), patch ?? {})));
+ipcMain.handle('save-holiday', (_event, holiday, originalDate) =>
+  mutate((d) => setHoliday(d, holiday ?? {}, originalDate ? String(originalDate) : undefined)));
+ipcMain.handle('delete-holiday', (_event, date) => mutate((d) => deleteHoliday(d, String(date))));
 
 const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
 

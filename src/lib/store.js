@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { HOLIDAY_TYPES } from './dtr.js';
 
 const FILE = 'dtr-data.json';
 
@@ -53,7 +54,7 @@ export function updateOffice(data, office, { inCharge, graceMinutes }) {
   data.offices = { ...data.offices, [office]: { ...data.offices[office], graceMinutes: grace, inCharge: name } };
 }
 
-export const HOLIDAY_TYPES = ['Regular Holiday', 'Special Non-Working Holiday', 'Local Holiday', 'Work Suspension'];
+export { HOLIDAY_TYPES };
 
 const isIsoDate = (s) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
