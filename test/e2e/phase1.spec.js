@@ -99,6 +99,8 @@ test('US-4 print and export PDF, single and whole office', async () => {
   await mockSave(app, path.join(out, 'hrmo.pdf'));
   await page.getByRole('button', { name: 'Export office PDF' }).click();
   await expect(status).toContainText('Saved hrmo.pdf');
+  // Only #2025204 has no time records in July 1-15 (every row in the device file is empty).
+  await expect(status.locator('.err')).toHaveText('1 of 11 employees have no time records for July 1-15, 2026: SHARMAINE BANAO (#2025204)');
   info = pdfInfo(path.join(out, 'hrmo.pdf'));
   expect(info.pages).toBe(11);
   await expect(page.locator('.page:visible')).toHaveCount(1); // batch pages are gone after export
@@ -128,6 +130,7 @@ test('US-4 print and export PDF, single and whole office', async () => {
   });
   await page.getByRole('button', { name: 'Print', exact: true }).click();
   await page.getByRole('button', { name: 'Print office' }).click();
+  await expect(status.locator('.err')).toContainText('1 of 11 employees have no time records');
   await expect.poll(() => app.evaluate(() => globalThis.printCalls)).toEqual([
     { pageSize: 'A4', landscape: false, pages: 1 },
     { pageSize: 'A4', landscape: false, pages: 11 },

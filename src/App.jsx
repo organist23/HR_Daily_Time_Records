@@ -49,27 +49,39 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   };
 
   // Prints or exports whatever pages are rendered right now.
-  const job = async (kind, name) => {
+  // `afterDone` lines are shown only when the print or export actually went through.
+  const job = async (kind, name, afterDone = []) => {
     setWorking(true);
+    const lines = [];
+    let done = false;
     try {
       if (kind === 'print') {
         const res = await window.api.print();
-        if (!res.ok && res.error !== 'cancelled') onNotice([{ ok: false, text: `Could not print: ${res.error}` }]);
+        done = res.ok;
+        if (!res.ok && res.error !== 'cancelled') lines.push({ ok: false, text: `Could not print: ${res.error}` });
       } else {
         const res = await window.api.exportPdf(`DTR - ${name} - ${periodShort}.pdf`);
-        if (res) onNotice([{ ok: true, text: `Saved ${res.path.split(/[\\/]/).pop()}` }]);
+        done = Boolean(res);
+        if (res) lines.push({ ok: true, text: `Saved ${res.path.split(/[\\/]/).pop()}` });
       }
     } catch (e) {
-      onNotice([{ ok: false, text: `Could not ${kind === 'print' ? 'print' : 'save PDF'}: ${ipcError(e)}` }]);
+      lines.push({ ok: false, text: `Could not ${kind === 'print' ? 'print' : 'save PDF'}: ${ipcError(e)}` });
     } finally {
       setWorking(false);
     }
+    if (done) lines.push(...afterDone);
+    if (lines.length) onNotice(lines);
   };
 
   // Office jobs render every employee's page first, then print or export once.
   useEffect(() => {
     if (!batch) return;
-    job(batch.kind, batch.name).finally(() => setBatch(null));
+    // Blank pages usually mean a missing import, or leave the admin should confirm.
+    const blank = officePages.filter(({ result: r }) => !r.rows.some((x) => x.amIn || x.amOut || x.pmIn || x.pmOut));
+    const warning = blank.length
+      ? [{ ok: false, text: `${blank.length} of ${officePages.length} employees have no time records for ${periodShort}: ${blank.map(({ e }) => `${e.name} (#${e.acNo})`).join(', ')}` }]
+      : [];
+    job(batch.kind, batch.name, warning).finally(() => setBatch(null));
   }, [batch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // One pass over all punches per batch, grouped by employee.
