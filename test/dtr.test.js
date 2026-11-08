@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { computeDtr, formatTime, periodLabel } from '../src/lib/dtr.js';
+import { computeDtr, formatTime, periodLabel, officialHours } from '../src/lib/dtr.js';
 
 const all = parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const of = (acNo) => all.filter((r) => r.acNo === acNo);
@@ -86,5 +86,22 @@ describe('periodLabel', () => {
     expect(periodLabel(2026, 7, 'first')).toBe('For the period of July 1-15, 2026');
     expect(periodLabel(2026, 7, 'second')).toBe('For the period of July 16-31, 2026');
     expect(periodLabel(2026, 2, 'second')).toBe('For the period of February 16-28, 2026');
+  });
+});
+
+describe('officialHours', () => {
+  it('reads on/off duty from the shown month', () => {
+    expect(officialHours(of('14'), 2026, 7)).toBe('8:00-12:00, 1:00-5:00');
+  });
+
+  it('prefers the shown month over other months', () => {
+    const p = (date, session, onDuty, offDuty) => ({ acNo: '1', name: 'X', date, session, onDuty, offDuty, in: '', out: '' });
+    const punches = [p('2026-07-01', 'AM', '08:00', '12:00'), p('2026-08-03', 'AM', '07:00', '11:00'), p('2026-08-03', 'PM', '12:00', '16:00')];
+    expect(officialHours(punches, 2026, 8)).toBe('7:00-11:00, 12:00-4:00');
+    expect(officialHours(punches, 2026, 9)).toBe('8:00-12:00, 12:00-4:00');
+  });
+
+  it('is empty with no punches', () => {
+    expect(officialHours([], 2026, 7)).toBe('');
   });
 });
