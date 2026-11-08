@@ -89,15 +89,34 @@ Conventions later phases inherit:
 - Dialogs use `useDialogKeys(firstRef, onCancel, busy)`.
 - The DTR preview stays mounted while hidden, so E2E tests scope duplicate labels (Month, Year) to the visible view.
 
-### Phase 3 — Time adjustments NEXT
+### Phase 3 — Time adjustments ✅ DONE (merged `86974a3`, 2026-11-09)
 
 Covers US-7.
 
 - Add, edit, clear, and revert any AM/PM time with a reason
 
-**Done when:** a work-from-home entry on a holiday shows the times, recomputes the days total, and survives a re-import.
+**Done when:** a work-from-home entry on a holiday shows the times, recomputes the days total, and survives a re-import. — **Verified** on 2026-11-09 with Playwright `_electron` and Vitest: 86/86 unit, 8/8 E2E. Checked:
+- the RONIE 7/01 work-from-home fix (2 → 3 days)
+- a 7/13 no-row day
+- validation errors
+- re-import, relaunch and revert
+- no marks in print
+- the unit test for adjusted times on a holiday
 
-### Phase 4 — Find and check LATER
+Results: `PHASE-3-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/store.js`: `adjustDay`, `revertDay`.
+- `src/lib/dtr.js`: `effectivePunches`, and `row.adjusted` from `computeDtr`.
+- `electron/main.js`: IPC `adjust-day`, `revert-day` (timestamp from main's clock).
+- React UI: `src/AdjustDialog.jsx`, and clickable day numbers in `src/DtrForm.jsx` (app view only).
+
+Conventions later phases inherit:
+- Device punches are never edited. Everything shown or printed comes from `effectivePunches(device, adjustments, office, acNo)`.
+- Admin adjustments always win over later imports.
+- Anything that must not print gets a screen-only style plus a `@media print` reset, checked with `emulateMedia({ media: 'print' })` and then reset with `{ media: null }`.
+
+### Phase 4 — Find and check NEXT
 
 Covers US-8, US-9, US-10.
 
