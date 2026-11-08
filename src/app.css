@@ -42,11 +42,22 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 .controls input[type='number'] { width: 90px; }
 .halves { display: flex; gap: 12px; border: 0; margin: 0; padding: 0; }
 .halves label { display: flex; align-items: center; gap: 4px; }
+.print-actions { display: flex; align-items: center; gap: 8px; }
+.print-batch { display: none; }
+
+/* Print and PDF: only DTR pages. An office batch replaces the on-screen page. */
+@media print {
+  body, .app, .body, .preview { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; }
+  .topbar, .results, .sidebar, .controls, .backdrop, .preview > p { display: none !important; }
+  .print-batch { display: block; }
+  .preview:has(.print-batch) > .page { display: none; }
+}
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }
 .dialog { background: var(--panel); border-radius: 8px; padding: 20px; width: 460px; max-width: calc(100% - 32px); }
 .dialog h2 { margin: 0 0 4px; font-size: 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; }
 .file-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-row input { width: 180px; }

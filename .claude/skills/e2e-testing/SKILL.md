@@ -63,13 +63,16 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
   and `sample_data/actual_raw_hand_writtern_dtr.jpg`. Report any difference instead of
   calling it a match.
 - **Print and PDF** (from Phase 1): `webContents.printToPDF` output is checked by page count
-  and page size (A4 = 595×842 pt), not only by whether a file exists.
+  and page size (A4 = 595×842 pt), not only by whether a file exists. Mock `dialog.showSaveDialog`
+  and `webContents.print` in main. To see the pages, render the PDF with PyMuPDF (`fitz`) into the scratchpad.
 - If the app shows data you did not import, stop. The pass is reading a real data folder.
 
 ## Teardown
 
 - Close every launched app (`await app.close()`), including on a failed assertion path.
-- Temp folders live under `os.tmpdir()` with prefix `dtr-e2e-`. Delete them after the pass.
+- Temp folders come from `tmpDir()` under `%TEMP%\dtr-e2e\`. `test/e2e/global-teardown.js` deletes that root after every run.
+  Each launch writes a Chromium profile there (`DTR_DATA_DIR` is also Electron's `userData`), so
+  never create test folders any other way. A previous pass filled the disk with them.
 - Never delete or edit anything under `%APPDATA%\employees-dtr-analyzer\`.
 - Record the pass in `PHASE-<N>-TEST-RESULTS.md`: date, driver, pass/fail per story and per
   assertion, mutation checks run, and anything left behind.
@@ -82,4 +85,6 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 | Test passes but the UI change is not visible | `dist/` is stale. Run `npm run test:e2e`, not `npx playwright test`, after renderer edits |
 | `Cannot access file ... HRMO (3).xls` | `XLSX.readFile` used in the ESM test. Read the buffer with `fs` |
 | Employees from an earlier run appear | `DTR_DATA_DIR` was not set, or a temp folder was reused across tests |
+| Exported PDF contains the whole app UI | `page.emulateMedia({ media: 'screen' })` was left on, which forces screen styles during printing. Reset with `{ media: null }` |
+| A locator fails or reads `''` right after a relaunch | It was created from the old `page`. Re-create locators from the new `page` |
 | A success line matches an error assertion | Assert on the `.err` line (`status.locator('.err', { hasText })`), not on the file name alone |

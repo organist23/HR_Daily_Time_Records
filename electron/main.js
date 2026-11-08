@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { loadData, saveData, mergeImport, resolveOffice } from '../src/lib/store.js';
+import { loadData, saveData, mergeImport, resolveOffice, updateOffice } from '../src/lib/store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
@@ -60,7 +60,8 @@ ipcMain.handle('import-files', (_event, items) => {
 });
 
 // A second instance would hold its own copy of the data and overwrite this one's saves.
-if (!app.requestSingleInstanceLock()) app.quit();
+const hasLock = app.requestSingleInstanceLock();
+if (!hasLock) app.quit();
 app.on('second-instance', () => {
   const win = BrowserWindow.getAllWindows()[0];
   if (win) {
@@ -69,7 +70,44 @@ app.on('second-instance', () => {
   }
 });
 
+ipcMain.handle('update-office', (_event, office, patch) => {
+  if (loadError) throw new Error(loadError);
+  const next = structuredClone(data);
+  updateOffice(next, String(office), patch ?? {});
+  saveData(dataDir, next);
+  data = next;
+  return data;
+});
+
+const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
+
+ipcMain.handle('print', (event) => new Promise((resolve) => {
+  windowOf(event).webContents.print(
+    { printBackground: true, pageSize: 'A4', landscape: false, margins: { marginType: 'none' } },
+    (ok, reason) => resolve({ ok, error: ok ? '' : reason }),
+  );
+}));
+
+// Writes only to the path the admin picks in the save dialog.
+ipcMain.handle('export-pdf', async (event, suggestedName) => {
+  const win = windowOf(event);
+  // Replace path and reserved characters first, so a name like "HR/Admin" stays whole.
+  const name = String(suggestedName || 'DTR.pdf').replace(/[\\/:*?"<>|]/g, '-');
+  const res = await dialog.showSaveDialog(win, {
+    defaultPath: path.join(app.getPath('documents'), name),
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  });
+  if (res.canceled || !res.filePath) return null;
+  // printToPDF takes margins in inches (marginType is a print() option); the .page box holds the form margins.
+  const pdf = await win.webContents.printToPDF({
+    pageSize: 'A4', printBackground: true, preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 },
+  });
+  fs.writeFileSync(res.filePath, pdf);
+  return { path: res.filePath };
+});
+
 app.whenReady().then(() => {
+  if (!hasLock) return; // quitting: the running instance gets focus instead
   const win = new BrowserWindow({
     width: 1280,
     height: 860,

@@ -42,3 +42,13 @@ export function saveData(dir, data) {
   fs.writeFileSync(`${file}.tmp`, JSON.stringify(data));
   fs.renameSync(`${file}.tmp`, file);
 }
+
+export function updateOffice(data, office, { inCharge, graceMinutes }) {
+  if (!Object.hasOwn(data.offices, office)) throw new Error(`Unknown office: ${office}`);
+  const grace = typeof graceMinutes === 'number' ? graceMinutes
+    : /^\d+$/.test(String(graceMinutes).trim()) ? Number(String(graceMinutes).trim()) : NaN;
+  if (!Number.isInteger(grace) || grace < 0 || grace > 60) throw new Error('Grace minutes must be a whole number from 0 to 60');
+  const name = String(inCharge ?? '').trim();
+  if (name.length > 100) throw new Error('In-charge name is too long (max 100 characters)');
+  data.offices = { ...data.offices, [office]: { ...data.offices[office], graceMinutes: grace, inCharge: name } };
+}

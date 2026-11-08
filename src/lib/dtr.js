@@ -63,3 +63,12 @@ export function computeDtr({ punches, year, month, half, graceMinutes }) {
   }
   return { rows, totalUndertime, credited, days: Math.floor(credited / 480) };
 }
+
+// "8:00-12:00, 1:00-5:00" from the shown month's punches; other months fill gaps.
+export function officialHours(punches, year, month) {
+  const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+  const inMonth = punches.filter((p) => p.date.startsWith(prefix));
+  const pick = (s) => inMonth.find((p) => p.session === s) ?? punches.find((p) => p.session === s);
+  return [pick('AM'), pick('PM')].filter(Boolean)
+    .map((p) => `${formatTime(p.onDuty)}-${formatTime(p.offDuty)}`).join(', ');
+}

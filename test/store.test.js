@@ -1,12 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice } from '../src/lib/store.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
-const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-'));
+const made = [];
+const tmpDir = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-'));
+  made.push(dir);
+  return dir;
+};
+afterAll(() => made.forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
 
 describe('mergeImport', () => {
   it('adds then updates without duplicates', () => {
@@ -82,5 +88,48 @@ describe('loadData / saveData', () => {
     fs.writeFileSync(file, '{bad');
     expect(() => loadData(dir)).toThrow();
     expect(fs.readFileSync(file, 'utf8')).toBe('{bad');
+  });
+});
+
+describe('updateOffice', () => {
+  const withHrmo = () => {
+    const data = emptyData();
+    mergeImport(data, 'HRMO', hrmo().slice(0, 2));
+    return data;
+  };
+
+  it('saves trimmed in-charge and numeric grace', () => {
+    const data = withHrmo();
+    updateOffice(data, 'HRMO', { inCharge: '  MARIVIC P. SARINAS ', graceMinutes: '0' });
+    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 0, inCharge: 'MARIVIC P. SARINAS' });
+  });
+
+  it.each([-1, 61, 'abc', 1.5, '', '0x10', '1e1', true, ' 5 x'])('rejects grace %s and leaves data unchanged', (grace) => {
+    const data = withHrmo();
+    expect(() => updateOffice(data, 'HRMO', { inCharge: 'X', graceMinutes: grace })).toThrow(/whole number from 0 to 60/);
+    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 15 });
+  });
+
+  it('updates an office named __proto__ as a plain key', () => {
+    const data = emptyData();
+    mergeImport(data, '__proto__', hrmo().slice(0, 2));
+    updateOffice(data, '__proto__', { inCharge: 'X', graceMinutes: 5 });
+    expect(Object.getPrototypeOf(data.offices)).toBe(Object.prototype);
+    expect(JSON.parse(JSON.stringify(data.offices)).__proto__).toEqual({ name: '__proto__', graceMinutes: 5, inCharge: 'X' });
+  });
+
+  it('accepts a padded whole number string', () => {
+    const data = withHrmo();
+    updateOffice(data, 'HRMO', { inCharge: '', graceMinutes: ' 5 ' });
+    expect(data.offices.HRMO.graceMinutes).toBe(5);
+  });
+
+  it('rejects a too-long in-charge name', () => {
+    expect(() => updateOffice(withHrmo(), 'HRMO', { inCharge: 'A'.repeat(101), graceMinutes: 15 })).toThrow(/too long/);
+  });
+
+  it('rejects an unknown office, including inherited names', () => {
+    expect(() => updateOffice(withHrmo(), 'Accounting', { inCharge: '', graceMinutes: 15 })).toThrow(/Unknown office/);
+    expect(() => updateOffice(withHrmo(), 'constructor', { inCharge: '', graceMinutes: 15 })).toThrow(/Unknown office/);
   });
 });

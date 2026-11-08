@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dtr-e2e-'));
+// All E2E temp folders live under one root that global-teardown.js deletes after the run.
+export const E2E_ROOT = path.join(os.tmpdir(), 'dtr-e2e');
+export const tmpDir = () => {
+  fs.mkdirSync(E2E_ROOT, { recursive: true });
+  return fs.mkdtempSync(path.join(E2E_ROOT, 'run-'));
+};
 export const HRMO = path.resolve('sample_data/HRMO (3).xls');
 
 export async function launch(dataDir) {
@@ -24,3 +29,10 @@ export async function importFiles(app, page, files) {
 }
 
 export const employeeButtons = (page) => page.getByRole('navigation', { name: 'Employees' }).getByRole('button');
+
+export async function importHrmo(app, page) {
+  const dlg = await importFiles(app, page, [HRMO]);
+  await dlg.getByLabel('Office for HRMO (3).xls').fill('HRMO');
+  await dlg.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('heading', { name: 'HRMO' }).waitFor();
+}

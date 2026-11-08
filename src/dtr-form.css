@@ -1,6 +1,6 @@
 /* CS Form 48, one copy per A4 page. Proportions follow the docx template grid
    (468 : 720 x5 : 540 twips), scaled to fit the page content area. */
-@page { size: A4 portrait; margin: 0.5in 0.7in; }
+@page { size: A4 portrait; margin: 0; } /* the .page box carries the margins */
 
 .page {
   width: 8.27in;
@@ -9,6 +9,10 @@
   margin: 0 auto;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+@media print {
+  .page { width: 210mm; height: 296mm; overflow: hidden; margin: 0; box-shadow: none; } /* under A4 so rounding never spills */
+  .page + .page { break-before: page; }
 }
 
 .dtr-form {

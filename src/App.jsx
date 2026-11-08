@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImportDialog from './ImportDialog.jsx';
 import DtrForm from './DtrForm.jsx';
-import { MONTHS, computeDtr, formatTime, periodLabel } from './lib/dtr.js';
+import OfficeDialog from './OfficeDialog.jsx';
+import { MONTHS, computeDtr, officialHours, periodLabel } from './lib/dtr.js';
 
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
 
-function Preview({ data, employee }) {
-  const punches = useMemo(() => {
-    const prefix = `${employee.office}|${employee.acNo}|`;
-    return Object.entries(data.punches).filter(([k]) => k.startsWith(prefix)).map(([, p]) => p);
-  }, [data, employee]);
+// Electron prefixes errors thrown in main; show only the message.
+const ipcError = (e) => String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+const punchesOf = (data, emp) => {
+  const prefix = `${emp.office}|${emp.acNo}|`;
+  return Object.entries(data.punches).filter(([k]) => k.startsWith(prefix)).map(([, p]) => p);
+};
+
+function Preview({ data, employee, onDataChange, onNotice }) {
+  const punches = useMemo(() => punchesOf(data, employee), [data, employee]);
 
   const latest = punches.reduce((max, p) => (p.date > max ? p.date : max), '');
   const today = new Date();
@@ -17,17 +23,72 @@ function Preview({ data, employee }) {
   const [yearText, setYearText] = useState(String(year)); // year applies only once 4 digits are typed
   const [month, setMonth] = useState(latest ? Number(latest.slice(5, 7)) : today.getMonth() + 1);
   const [half, setHalf] = useState('full');
+  const settings = data.offices[employee.office] ?? {};
+  const [inCharge, setInCharge] = useState(settings.inCharge ?? ''); // one-print override, never saved
+  const [editing, setEditing] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
 
-  const graceMinutes = data.offices[employee.office]?.graceMinutes ?? 15;
+  const graceMinutes = settings.graceMinutes ?? 15;
   const result = computeDtr({ punches, year, month, half, graceMinutes });
-  // Official hours from the shown month's punches; fall back to any punch for an empty month.
-  const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`;
-  const inMonth = punches.filter((p) => p.date.startsWith(monthPrefix));
-  const pickSession = (s) => inMonth.find((p) => p.session === s) ?? punches.find((p) => p.session === s);
-  const am = pickSession('AM');
-  const pm = pickSession('PM');
-  const officialHours = [am, pm].filter(Boolean)
-    .map((p) => `${formatTime(p.onDuty)}-${formatTime(p.offDuty)}`).join(', ');
+  const periodText = periodLabel(year, month, half);
+  const periodShort = periodText.replace(/^For the (month|period) of /, '');
+  const closeSettings = useCallback(() => setEditing(false), []);
+
+  const saveSettings = async (patch) => {
+    let next;
+    try {
+      next = await window.api.updateOffice(employee.office, patch);
+    } catch (e) {
+      throw new Error(ipcError(e));
+    }
+    onDataChange(next);
+    // Follow the saved name only when it changed; otherwise keep a typed one-print override.
+    if (next.offices[employee.office].inCharge !== (settings.inCharge ?? '')) setInCharge(next.offices[employee.office].inCharge);
+    setEditing(false);
+  };
+
+  // Prints or exports whatever pages are rendered right now.
+  const job = async (kind, name) => {
+    setWorking(true);
+    try {
+      if (kind === 'print') {
+        const res = await window.api.print();
+        if (!res.ok && res.error !== 'cancelled') onNotice([{ ok: false, text: `Could not print: ${res.error}` }]);
+      } else {
+        const res = await window.api.exportPdf(`DTR - ${name} - ${periodShort}.pdf`);
+        if (res) onNotice([{ ok: true, text: `Saved ${res.path.split(/[\\/]/).pop()}` }]);
+      }
+    } catch (e) {
+      onNotice([{ ok: false, text: `Could not ${kind === 'print' ? 'print' : 'save PDF'}: ${ipcError(e)}` }]);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  // Office jobs render every employee's page first, then print or export once.
+  useEffect(() => {
+    if (!batch) return;
+    job(batch.kind, batch.name).finally(() => setBatch(null));
+  }, [batch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One pass over all punches per batch, grouped by employee.
+  const officePages = useMemo(() => {
+    if (!batch) return [];
+    const byEmployee = new Map();
+    for (const p of Object.values(data.punches)) {
+      if (p.office !== employee.office) continue;
+      if (!byEmployee.has(p.acNo)) byEmployee.set(p.acNo, []);
+      byEmployee.get(p.acNo).push(p);
+    }
+    return Object.values(data.employees)
+      .filter((e) => e.office === employee.office)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((e) => {
+        const p = byEmployee.get(e.acNo) ?? [];
+        return { e, p, result: computeDtr({ punches: p, year, month, half, graceMinutes }) };
+      });
+  }, [batch, data, employee.office, year, month, half, graceMinutes]);
 
   return (
     <>
@@ -56,11 +117,37 @@ function Preview({ data, employee }) {
             </label>
           ))}
         </fieldset>
+        <label>
+          In charge (this print){' '}
+          <input aria-label="In charge (this print)" value={inCharge} maxLength={100}
+            onChange={(e) => setInCharge(e.target.value)} />
+        </label>
+        <button onClick={() => setEditing(true)}>Office settings</button>
+        <div className="print-actions">
+          <button disabled={working || !!batch} onClick={() => job('print')}>Print</button>
+          <button disabled={working || !!batch} onClick={() => job('pdf', employee.name)}>Export PDF</button>
+          <button disabled={working || !!batch} onClick={() => setBatch({ kind: 'print' })}>Print office</button>
+          <button disabled={working || !!batch} onClick={() => setBatch({ kind: 'pdf', name: employee.office })}>Export office PDF</button>
+          {working && <span className="muted">Working…</span>}
+        </div>
       </div>
       <div className="page">
-        <DtrForm name={employee.name} periodText={periodLabel(year, month, half)}
-          officialHours={officialHours} half={half} result={result} />
+        <DtrForm name={employee.name} periodText={periodText}
+          officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge} />
       </div>
+      {batch && (
+        <div className="print-batch" aria-hidden="true">
+          {officePages.map(({ e, p, result: r }) => (
+            <div className="page" key={`${e.office}|${e.acNo}`}>
+              <DtrForm name={e.name} periodText={periodText} officialHours={officialHours(p, year, month)}
+                half={half} result={r} inCharge={inCharge} />
+            </div>
+          ))}
+        </div>
+      )}
+      {editing && (
+        <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings} />
+      )}
     </>
   );
 }
@@ -70,7 +157,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null); // file paths waiting for office names
   const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState(null);
+  const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
 
   useEffect(() => {
@@ -102,9 +189,14 @@ export default function App() {
     try {
       const res = await window.api.importFiles(items);
       setData(res.data);
-      setResults(res.results);
+      setMessages(res.results.map((r) => ({
+        ok: r.ok,
+        text: r.ok
+          ? `${r.file}: ${r.added} added, ${r.updated} updated, ${r.skipped} skipped (office ${r.office})`
+          : `${r.file}: ${r.error}`,
+      })));
     } catch (e) {
-      setResults([{ file: 'Import', ok: false, error: e.message }]);
+      setMessages([{ ok: false, text: `Import: ${ipcError(e)}` }]);
     } finally {
       setBusy(false);
     }
@@ -119,16 +211,10 @@ export default function App() {
         </button>
       </header>
 
-      {results && (
+      {messages && (
         <div className="results" role="status">
-          {results.map((r, i) => (
-            <div key={i} className={r.ok ? 'ok' : 'err'}>
-              {r.ok
-                ? `${r.file}: ${r.added} added, ${r.updated} updated, ${r.skipped} skipped (office ${r.office})`
-                : `${r.file}: ${r.error}`}
-            </div>
-          ))}
-          <button className="link" onClick={() => setResults(null)} aria-label="Dismiss import results">×</button>
+          {messages.map((m, i) => <div key={i} className={m.ok ? 'ok' : 'err'}>{m.text}</div>)}
+          <button className="link" onClick={() => setMessages(null)} aria-label="Dismiss messages">×</button>
         </div>
       )}
 
@@ -162,7 +248,7 @@ export default function App() {
         </nav>
         <main className="preview">
           {employee ? (
-            <Preview key={selected} data={data} employee={employee} />
+            <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
           ) : (
             <p className="muted">Select an employee to preview their DTR.</p>
           )}
