@@ -204,10 +204,29 @@ Conventions later phases inherit:
 - Delete is offered only in the Archived view, behind `ConfirmDialog`, which names the record and what goes with it.
 - An employee's day keys are matched with `isDayKeyOf(key, office, acNo)`, never a bare prefix.
 
-### Phase 5b — Backup and restore NEXT
+### Phase 5b — Backup and restore ✅ DONE (merged `4519b38`, 2026-11-09)
 
 Covers US-12.
 
 - Backup to one file and restore from it, with an automatic copy of the current data first
 
-**Done when:** a backup restored after deleting all data brings back every office, employee, adjustment, and holiday.
+**Done when:** a backup restored after deleting all data brings back every office, employee, adjustment, and holiday. — **Verified** on 2026-11-09 with Playwright `_electron` and Vitest: 114/114 unit, 14/14 E2E (full run, Part one complete). Checked:
+- backup to a picked file
+- delete the office and the holiday, then restore: Cancel writes nothing, Confirm copies the old file byte for byte first
+- everything came back: archived employee, adjustment, holiday, and in-charge name, and it persists after relaunch
+- a second restore keeps the first copy
+- invalid and truncated files change nothing
+
+Results: `docs/test-results/PHASE-5B-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/store.js`: `makeBackup`, `readBackup`.
+- `src/lib/dtr.js`: `adjustedDayCount`.
+- `electron/main.js`: IPC `backup`, `restore-pick`, `restore-cancel`, `restore-apply`.
+- React UI: `Backup` and `Restore` in the `src/App.jsx` topbar, and the `busyLabel` prop in `src/ConfirmDialog.jsx`.
+
+Deliberately not built, and why: scheduled or automatic backups (not in US-12), and an E2E for retrying after a disk error (no outer-boundary way to make the write fail).
+
+Conventions later phases inherit:
+- A new field in the data must also be added to `readBackup` (both its checks and the rebuilt object), or restore drops it.
+- Untrusted files are read only in main, checked fully, and applied only after confirmation. The renderer never sends the data to apply.
