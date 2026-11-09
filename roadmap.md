@@ -174,7 +174,7 @@ Conventions later phases inherit:
 - The sidebar shows the `shown` groups (filtered). `groups` stays the full list for anything that needs every office.
 - Date and time in tests come from `app.context().clock.install(...)` plus `page.reload()`, never the real clock.
 
-### Phase 5a — Archive and delete NEXT
+### Phase 5a — Archive and delete ✅ DONE (merged `9dc683c`, 2026-11-09)
 
 Split from Phase 5 on 2026-11-09 (too big for one build, user decision).
 
@@ -183,11 +183,28 @@ Covers US-11.
 - Archive and restore for employees and offices, with an Archived view
 - Delete for archived employees and offices, only from the Archived view, with confirmation naming what goes
 
-**Done when:** archiving duplicate SHARMAINE BANAO (#2025204) hides them from the HRMO list and office print, restoring brings them back, the DTR screen and Office settings have no delete button, and deleting the archived HRMO1 office from Archived removes its employees and their punches after confirmation.
+**Done when:** archiving duplicate SHARMAINE BANAO (#2025204) hides them from the HRMO list and office print, restoring brings them back, the DTR screen and Office settings have no delete button, and deleting the archived HRMO1 office from Archived removes its employees and their punches after confirmation. — **Verified** on 2026-11-09 with Playwright `_electron` and Vitest: 96/96 unit, 13/13 E2E (full run). Checked:
+- archiving #2025204: HRMO 11 → 10, office PDF 10 pages, kept on re-import, restored
+- archiving office HRMO1: group and filter option gone, filter reset, archived-import notice, restored
+- no delete button on the DTR screen or in Office settings
+- deleting from Archived, with Cancel and Escape keeping data: employee (14 punches) and office (10 employees, 140 punches), which persist after relaunch
 
-Deliberately not built, and why: backup and restore (Phase 5b), delete-import (dropped from US-11).
+Results: `docs/test-results/PHASE-5A-TEST-RESULTS.md`.
 
-### Phase 5b — Backup and restore LATER
+Shipped as:
+- `src/lib/store.js`: `setArchived`, `deleteEmployee`, `deleteOffice`, and `mergeImport` keeping existing employee fields.
+- `src/lib/dtr.js`: `isDayKeyOf`.
+- `electron/main.js`: IPC `set-archived`, `delete-employee`, `delete-office`.
+- React UI: `src/ArchivedView.jsx`, `src/ConfirmDialog.jsx`, `Archive office` in `src/OfficeDialog.jsx`, `Archive employee` and the `records` actions, `isActive`, and the `Archived` topbar view in `src/App.jsx`.
+
+Deliberately not built, and why: backup and restore (Phase 5b), delete-import (dropped from US-11), confirmation on holiday Delete (Phase 2 gap, reported for a separate Amend).
+
+Conventions later phases inherit:
+- Records are hidden with an optional `archived: true` on `employees[key]` or `offices[name]`. Use `isActive(data, emp)` for anything that lists or prints employees.
+- Delete is offered only in the Archived view, behind `ConfirmDialog`, which names the record and what goes with it.
+- An employee's day keys are matched with `isDayKeyOf(key, office, acNo)`, never a bare prefix.
+
+### Phase 5b — Backup and restore NEXT
 
 Covers US-12.
 
