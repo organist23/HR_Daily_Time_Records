@@ -269,4 +269,12 @@ describe('checkDate', () => {
     expect(rows[0]).toMatchObject({ office: 'ACCT', name: 'RELITA BARAYA' });
     expect(rows[1]).toMatchObject({ office: 'HRMO', name: 'JENNYVE TANGO' });
   });
+
+  it('orders offices like the sidebar (plain string order: uppercase before lowercase)', () => {
+    const data = hrmo();
+    mergeImport(data, 'acct', all.filter((r) => r.acNo === '14'));
+    const rows = checkDate(data, '2026-07-03');
+    expect(rows[0].office).toBe('HRMO');
+    expect(rows.at(-1)).toMatchObject({ office: 'acct', name: 'RELITA BARAYA' });
+  });
 });

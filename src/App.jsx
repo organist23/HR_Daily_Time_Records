@@ -240,12 +240,13 @@ function Preview({ data, employee, onDataChange, onNotice }) {
 const CLOCK_FORMAT = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' };
 
 // Its own component so the ticking re-renders only the clock.
+// Each tick is scheduled for the next second boundary, so seconds are never skipped by drift.
 function Clock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const id = setTimeout(() => setNow(new Date()), 1000 - now.getMilliseconds());
+    return () => clearTimeout(id);
+  }, [now]);
   return <time className="clock muted" aria-label="Current date and time">{now.toLocaleString('en-US', CLOCK_FORMAT)}</time>;
 }
 
@@ -273,10 +274,12 @@ export default function App() {
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
     }));
   }, [data]);
+  const offices = useMemo(() => groups.map((g) => g.office), [groups]);
 
   // Office filter and case-insensitive name or AC-No search, applied as the admin types.
+  // A leading '#' is ignored, since the list shows AC-No as '#14'.
   const shown = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim().toLowerCase().replace(/^#/, '');
     return groups
       .filter((g) => !officeFilter || g.office === officeFilter)
       .map((g) => ({ ...g, employees: g.employees.filter((e) => !q || e.name.toLowerCase().includes(q) || e.acNo.toLowerCase().includes(q)) }))
@@ -399,9 +402,10 @@ export default function App() {
               onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
             />
           )}
-          {view === 'date' && data && (
-            <DateCheckView data={data} offices={groups.map((g) => g.office)} onOpen={open} />
-          )}
+          {/* Kept mounted while hidden so the picked date and office survive opening a DTR. */}
+          <div hidden={view !== 'date'}>
+            {data && <DateCheckView data={data} offices={offices} onOpen={open} />}
+          </div>
           {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
           <div hidden={view !== 'dtr'}>
             {employee ? (

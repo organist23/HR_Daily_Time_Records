@@ -112,7 +112,8 @@ export function checkDate(data, date) {
       const status = label || (set === 4 ? 'Present' : set === 0 ? 'Absent' : 'Incomplete');
       return { key, office: emp.office, acNo: emp.acNo, name: emp.name, ...times, status };
     })
-    .sort((a, b) => a.office.localeCompare(b.office) || a.name.localeCompare(b.name));
+    // Offices in the same order as the sidebar (plain string order), names by localeCompare.
+    .sort((a, b) => (a.office < b.office ? -1 : a.office > b.office ? 1 : a.name.localeCompare(b.name)));
 }
 
 // "8:00-12:00, 1:00-5:00" from the shown month's punches; other months fill gaps.

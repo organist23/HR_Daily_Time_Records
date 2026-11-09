@@ -86,7 +86,7 @@ button.danger { color: var(--danger); border-color: var(--danger); }
 .top-left { display: flex; align-items: baseline; gap: 16px; }
 .clock { font-size: 13px; }
 .date-check { max-width: 10in; margin: 0 auto; }
-.date-check .controls { width: auto; }
+.check-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 12px; }
 .check-table { width: 100%; border-collapse: collapse; background: var(--panel); }
 .check-table th, .check-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .check-table th { font-size: 12px; color: var(--muted); font-weight: 600; }

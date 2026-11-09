@@ -18,7 +18,7 @@ export default function DateCheckView({ data, offices, onOpen }) {
 
   return (
     <section className="date-check" aria-label="Date check">
-      <div className="controls">
+      <div className="check-controls">
         <label>
           Date{' '}
           <input aria-label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

@@ -35,6 +35,9 @@ test('US-8 office filter and live search open the DTR', async () => {
     await search.fill('20252');
     await expect(list).toHaveCount(2);
     await expect(list.first()).toContainText('#2025204');
+    await search.fill('#14'); // as shown in the list
+    await expect(list).toHaveCount(2);
+    await expect(list.first()).toContainText('RELITA BARAYA');
     await search.fill('zzz');
     await expect(list).toHaveCount(0);
     await expect(page.getByText('No employees match.')).toBeVisible();
@@ -72,6 +75,13 @@ test('US-9 date check lists everyone with a status', async () => {
     await expect(view.locator('tr[data-key="HRMO|14"] td').nth(3)).toHaveText('7:54');
     await expect(view.locator('tr[data-key="HRMO|14"] td').nth(5)).toHaveText('');
     await expect(view.locator('tr[data-key="HRMO|14"] td').nth(6)).toHaveText('5:00');
+
+    // Opening a DTR and coming back keeps the picked date and office.
+    await view.locator('tr[data-key="HRMO|218"]').getByRole('button', { name: 'JOANNE M ESTRADA' }).click();
+    await expect(page.locator('.dtr-form .name-line').first()).toHaveText('JOANNE M ESTRADA');
+    await page.getByRole('button', { name: 'Date check' }).click();
+    await expect(view.getByLabel('Date', { exact: true })).toHaveValue('2026-07-03');
+    await expect(rows).toHaveCount(11);
 
     // All offices: both copies.
     await view.getByLabel('Office', { exact: true }).selectOption('');
