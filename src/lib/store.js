@@ -46,8 +46,8 @@ const without = (obj, prefix) => Object.fromEntries(Object.entries(obj ?? {}).fi
 export function deleteEmployee(data, { office, acNo }) {
   const key = `${office}|${acNo}`;
   if (!Object.hasOwn(data.employees, key)) throw new Error('Unknown employee');
-  data.employees = without(data.employees, `${key}|`);
-  delete data.employees[key];
+  const { [key]: _, ...employees } = data.employees;
+  data.employees = employees;
   data.punches = without(data.punches, `${key}|`);
   data.adjustments = without(data.adjustments, `${key}|`);
 }
