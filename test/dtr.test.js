@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { computeDtr, formatTime, periodLabel, officialHours, effectivePunches } from '../src/lib/dtr.js';
+import { computeDtr, formatTime, periodLabel, officialHours, effectivePunches, checkDate } from '../src/lib/dtr.js';
+import { emptyData, mergeImport } from '../src/lib/store.js';
 
 const all = parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
 const of = (acNo) => all.filter((r) => r.acNo === acNo);
@@ -217,5 +218,55 @@ describe('adjustments', () => {
     const d = ronie(adj, h);
     expect(d.rows[0]).toMatchObject({ label: 'LOCAL HOLIDAY', amOut: '', undertime: 0, adjusted: [] });
     expect([d.credited, d.days, d.totalUndertime]).toEqual([1200, 2, 960]);
+  });
+});
+
+describe('checkDate', () => {
+  const hrmo = () => {
+    const data = emptyData();
+    mergeImport(data, 'HRMO', all);
+    return data;
+  };
+  const byName = (rows) => Object.fromEntries(rows.map((r) => [r.name, r]));
+  const statuses = (rows, status) => rows.filter((r) => r.status === status).map((r) => r.name).sort();
+
+  it('7/03: 3 Present, 2 Incomplete, 6 Absent (hand-derived from the raw rows)', () => {
+    const rows = checkDate(hrmo(), '2026-07-03');
+    expect(rows).toHaveLength(11);
+    expect(statuses(rows, 'Present')).toEqual(['JOANNE M ESTRADA', 'MARIE JOY DUGAYSAN', 'RONIE LOUISE BERMUDEZ']);
+    expect(statuses(rows, 'Incomplete')).toEqual(['JOHN RYAN A. LAZARO', 'RELITA BARAYA']);
+    expect(statuses(rows, 'Absent')).toEqual(['JENNYVE TANGO', 'MARY ANN EGTAPEN', 'REZABEL M. CAGA', 'SHAENA CATBAGAN', 'SHARMAINE BANAO', 'sharmaine banao']);
+    expect(byName(rows)['RELITA BARAYA']).toMatchObject({ office: 'HRMO', acNo: '14', amIn: '7:54', amOut: '12:00', pmIn: '', pmOut: '5:00' });
+  });
+
+  it('a workday with no rows lists everyone as Absent', () => {
+    const rows = checkDate(hrmo(), '2026-07-13');
+    expect(rows).toHaveLength(11);
+    expect(rows.every((r) => r.status === 'Absent')).toBe(true);
+  });
+
+  it('weekends and holidays show the label with blank times', () => {
+    const data = hrmo();
+    expect(checkDate(data, '2026-07-04').every((r) => r.status === 'SATURDAY')).toBe(true);
+    data.holidays = { '2026-07-03': { date: '2026-07-03', name: 'X', type: 'Regular Holiday' } };
+    expect(byName(checkDate(data, '2026-07-03'))['JOANNE M ESTRADA']).toMatchObject({ status: 'REGULAR HOLIDAY', amIn: '', pmOut: '' });
+  });
+
+  it('uses adjusted times', () => {
+    const data = hrmo();
+    const at = '2026-11-09T02:00:00.000Z';
+    data.adjustments = {
+      'HRMO|568|2026-07-01|AM': { in: '08:00', out: '12:00', onDuty: '08:00', offDuty: '12:00', reason: 'WFH', at },
+      'HRMO|568|2026-07-01|PM': { in: '13:00', out: '17:00', onDuty: '13:00', offDuty: '17:00', reason: 'WFH', at },
+    };
+    expect(byName(checkDate(data, '2026-07-01'))['RONIE LOUISE BERMUDEZ']).toMatchObject({ status: 'Present', amOut: '12:00', pmOut: '5:00' });
+  });
+
+  it('sorts by office then name', () => {
+    const data = hrmo();
+    mergeImport(data, 'ACCT', all.filter((r) => r.acNo === '14'));
+    const rows = checkDate(data, '2026-07-03');
+    expect(rows[0]).toMatchObject({ office: 'ACCT', name: 'RELITA BARAYA' });
+    expect(rows[1]).toMatchObject({ office: 'HRMO', name: 'JENNYVE TANGO' });
   });
 });
