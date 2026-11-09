@@ -282,6 +282,22 @@ describe('time adjustments', () => {
     expect(Object.keys(data.adjustments)).toHaveLength(2);
   });
 
+  it.each(['2026-07-04', '2026-07-05'])('refuses a weekend (%s)', (date) => {
+    const data = ronie();
+    expect(() => adjustDay(data, { ...wfh, date }, AT)).toThrow(`${date} is a non-working day`);
+    expect(data.adjustments ?? {}).toEqual({});
+  });
+
+  it('refuses a holiday, and still reverts an adjustment made before the holiday', () => {
+    const data = ronie();
+    adjustDay(data, wfh, AT);
+    setHoliday(data, { date: '2026-07-01', name: 'X', type: 'Local Holiday' });
+    expect(() => adjustDay(data, { ...wfh, pm: { in: '13:00', out: '16:00' } }, AT)).toThrow('2026-07-01 is a non-working day');
+    expect(data.adjustments['HRMO|568|2026-07-01|PM']).toMatchObject({ out: '17:00' });
+    revertDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01' });
+    expect(data.adjustments).toEqual({});
+  });
+
   it('reverts a day, and refuses when nothing is adjusted', () => {
     const data = ronie();
     adjustDay(data, wfh, AT);
