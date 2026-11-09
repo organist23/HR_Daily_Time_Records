@@ -147,7 +147,7 @@ Conventions later phases inherit:
 - Holiday and weekend rows have no times, no credit, and no undertime. Deleting a holiday makes that day a workday again.
 - `docs/test-results/` is tracked. `.gitignore` ignores only the root `/test-results/`.
 
-### Phase 4 — Find and check NEXT
+### Phase 4 — Find and check ✅ DONE (merged `1b31f95`, 2026-11-09)
 
 Paused 2026-11-09: Phase 6 built first by user decision. Not started, so no branch. Becomes NEXT when Phase 6 is DONE.
 
@@ -156,9 +156,25 @@ Covers US-8, US-10. US-9 withdrawn 2026-11-09 before merge (user decision: the s
 - Office filter and live name/AC-No search
 - Live date and time display
 
-**Done when:** searching "lazaro" under HRMO opens his DTR, and the clock ticks every second.
+**Done when:** searching "lazaro" under HRMO opens his DTR, and the clock ticks every second. — **Verified** on 2026-11-09 with Playwright `_electron` and Vitest: 90/90 unit, 12/12 E2E (full run). Checked:
+- office filter (`HRMO1` 11 of 22)
+- case-insensitive name and AC-No search, including `#14`
+- the no-match message and opening LAZARO's DTR
+- the clock under an installed fake clock: 10:00:00 → 10:00:02 → 10:01:02
 
-### Phase 5 — Archive, delete, backup LATER
+Results: `docs/test-results/PHASE-4-TEST-RESULTS.md`.
+
+Shipped as:
+- React UI in `src/App.jsx`: the sidebar `Office filter` select and `Search name or AC-No` input (`shown` memo), the `open(key)` helper, and the `Clock` component in the topbar.
+- Styles: `.sidebar-filters`, `.top-left`, `.clock` in `src/app.css`.
+
+Deliberately not built, and why: US-9 date check (withdrawn), archived-employee filtering (Phase 5 owns archive).
+
+Conventions later phases inherit:
+- The sidebar shows the `shown` groups (filtered). `groups` stays the full list for anything that needs every office.
+- Date and time in tests come from `app.context().clock.install(...)` plus `page.reload()`, never the real clock.
+
+### Phase 5 — Archive, delete, backup NEXT
 
 Covers US-11, US-12.
 
