@@ -80,6 +80,7 @@ test('US-11 archive, restore, and delete employees and offices', async () => {
     await expect(dlg).toContainText('Delete SHARMAINE BANAO (#2025204) from HRMO1? This removes 14 punches and 0 adjustments. This cannot be undone.');
     await dlg.getByRole('button', { name: 'Cancel' }).click();
     await expect(dlg).toHaveCount(0);
+    await expect(list).toHaveCount(22);
     await page.getByRole('button', { name: 'Delete employee' }).click();
     await page.keyboard.press('Escape');
     await expect(dlg).toHaveCount(0);
