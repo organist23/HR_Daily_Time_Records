@@ -55,6 +55,14 @@ export function effectivePunches(punches, adjustments, office, acNo) {
   return [...byKey.values()];
 }
 
+// Label of a holiday (its type) or weekend for an ISO date, or '' for a workday.
+export function offDayLabel(date, holidays = {}) {
+  const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;
+  if (holiday) return String(holiday.type || 'Holiday').toUpperCase();
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
+}
+
 export function computeDtr({ punches, year, month, half, graceMinutes, holidays = {} }) {
   const [from, to] = periodRange(year, month, half);
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
@@ -67,22 +75,17 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
     const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
-      const am = byKey.get(`${date}|AM`);
-      const pm = byKey.get(`${date}|PM`);
-      Object.assign(row, {
-        amIn: formatTime(am?.in), amOut: formatTime(am?.out),
-        pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
-        adjusted: [[am, 'in', 'amIn'], [am, 'out', 'amOut'], [pm, 'in', 'pmIn'], [pm, 'out', 'pmOut']]
-          .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
-      });
-      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-      const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;
-      const offLabel = holiday ? String(holiday.type || 'Holiday').toUpperCase()
-        : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
-      if (offLabel) {
-        // Non-working day: the label always wins, with no credit and no undertime.
-        Object.assign(row, { amIn: '', amOut: '', pmIn: '', pmOut: '', adjusted: [], label: offLabel });
-      } else {
+      // Non-working day: the label always wins, with no times, credit, or undertime.
+      row.label = offDayLabel(date, holidays);
+      if (!row.label) {
+        const am = byKey.get(`${date}|AM`);
+        const pm = byKey.get(`${date}|PM`);
+        Object.assign(row, {
+          amIn: formatTime(am?.in), amOut: formatTime(am?.out),
+          pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
+          adjusted: [[am, 'in', 'amIn'], [am, 'out', 'amOut'], [pm, 'in', 'pmIn'], [pm, 'out', 'pmOut']]
+            .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
+        });
         for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
           row.undertime += s.undertime;
           credited += s.credited;
