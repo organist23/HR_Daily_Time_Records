@@ -363,7 +363,56 @@ export default function App() {
         'Delete office', () => window.api.deleteOffice(office), `Deleted office ${office}.`);
     },
   };
-  const closeConfirm = useCallback(() => setConfirm(null), []);
+  // A restore confirmation also tells main to drop the picked backup.
+  const closeConfirm = () => {
+    confirm?.onCancel?.();
+    setConfirm(null);
+  };
+
+  const backup = async () => {
+    try {
+      const res = await window.api.backup();
+      if (res) setMessages([{ ok: true, text: `Backup saved: ${res.path.split(/[\\/]/).pop()}` }]);
+    } catch (e) {
+      setMessages([{ ok: false, text: `Could not save the backup: ${ipcError(e)}` }]);
+    }
+  };
+
+  // Main reads and checks the file first. Nothing changes until the admin confirms.
+  const restore = async () => {
+    let pick;
+    try {
+      pick = await window.api.restorePick();
+    } catch (e) {
+      setMessages([{ ok: false, text: `Could not restore: ${ipcError(e)}` }]);
+      return;
+    }
+    if (!pick) return;
+    const c = pick.counts;
+    const saved = Number.isNaN(Date.parse(pick.savedAt)) ? 'at an unknown time' : new Date(pick.savedAt).toLocaleString('en-US');
+    setConfirm({
+      title: 'Restore backup',
+      confirmLabel: 'Restore',
+      busyLabel: 'Restoring…',
+      message: `Replace all current data with the backup ${pick.file} saved ${saved}? It has `
+        + `${plural(c.offices, 'office', 'offices')}, ${plural(c.employees, 'employee', 'employees')}, ${plural(c.punches, 'punch', 'punches')}, `
+        + `${plural(c.adjustedDays, 'adjusted day', 'adjusted days')}, ${plural(c.holidays, 'holiday', 'holidays')}. `
+        + (pick.copy ? `The current data will first be copied to ${pick.copy} in the data folder.` : 'There is no current data to copy.'),
+      onCancel: () => window.api.restoreCancel(),
+      run: async () => {
+        let res;
+        try {
+          res = await window.api.restoreApply();
+        } catch (e) {
+          throw new Error(ipcError(e));
+        }
+        setData(res.data);
+        setError('');
+        setConfirm(null);
+        setMessages([{ ok: true, text: res.copy ? `Restored the backup. Previous data copied to ${res.copy}.` : 'Restored the backup.' }]);
+      },
+    });
+  };
 
   const pick = async () => {
     const paths = await window.api.pickExcelFiles();
@@ -416,6 +465,9 @@ export default function App() {
           <button onClick={() => setView(view === 'holidays' ? 'dtr' : 'holidays')} disabled={!data}>
             {view === 'holidays' ? 'DTR preview' : 'Holidays'}
           </button>
+          <button onClick={backup} disabled={!data}>Backup</button>
+          {/* Enabled when the data file failed to load, so a backup can recover it. */}
+          <button onClick={restore} disabled={busy || (!data && !error)}>Restore</button>
           <button className="primary" onClick={pick} disabled={busy || !data}>
             {busy ? 'Importing…' : 'Import Excel'}
           </button>
@@ -500,7 +552,7 @@ export default function App() {
       )}
       {confirm && (
         <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel}
-          onConfirm={confirm.run} onCancel={closeConfirm} />
+          busyLabel={confirm.busyLabel} onConfirm={confirm.run} onCancel={closeConfirm} />
       )}
     </div>
   );

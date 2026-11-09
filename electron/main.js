@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import {
   loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
-  setArchived, deleteEmployee, deleteOffice,
+  setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup,
 } from '../src/lib/store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -102,6 +102,63 @@ ipcMain.handle('delete-employee', (_event, target) => {
 ipcMain.handle('delete-office', (_event, office) => mutate((d) => deleteOffice(d, String(office))));
 
 const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
+
+// Backup and restore. Main writes only to the path picked in the save dialog and to a copy inside the data folder.
+const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
+const pad = (n) => String(n).padStart(2, '0');
+let pendingRestore = null; // { data, copy } checked by readBackup; the renderer never sends data to restore
+const currentFile = path.join(dataDir, 'dtr-data.json');
+
+ipcMain.handle('backup', async (event) => {
+  if (loadError) throw new Error(loadError);
+  const t = new Date();
+  const res = await dialog.showSaveDialog(windowOf(event), {
+    defaultPath: path.join(app.getPath('documents'), `DTR-backup-${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}.json`),
+    filters: [{ name: 'DTR backup', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePath) return null;
+  fs.writeFileSync(res.filePath, makeBackup(data, t.toISOString()));
+  return { path: res.filePath };
+});
+
+// Reads and checks the picked file. Nothing changes until restore-apply.
+ipcMain.handle('restore-pick', async (event) => {
+  pendingRestore = null;
+  const res = await dialog.showOpenDialog(windowOf(event), {
+    properties: ['openFile'],
+    filters: [{ name: 'DTR backup', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  const file = res.filePaths[0];
+  if (fs.statSync(file).size > MAX_BACKUP_BYTES) throw new Error('Invalid backup: file is larger than 50 MB');
+  const { data: restored, savedAt } = readBackup(fs.readFileSync(file, 'utf8'));
+  const t = new Date();
+  // No copy when there is no data file yet (first run).
+  const copy = !fs.existsSync(currentFile) ? null : `dtr-data-before-restore-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
+  pendingRestore = { data: restored, copy };
+  const count = (m) => Object.keys(restored[m]).length;
+  const adjustedDays = new Set(Object.keys(restored.adjustments).map((k) => k.slice(0, k.lastIndexOf('|')))).size;
+  return {
+    file: path.basename(file), savedAt, copy,
+    counts: { offices: count('offices'), employees: count('employees'), punches: count('punches'), adjustedDays, holidays: count('holidays') },
+  };
+});
+
+ipcMain.handle('restore-cancel', () => {
+  pendingRestore = null;
+});
+
+// Copies the current data file byte for byte, then replaces the data with the checked backup.
+ipcMain.handle('restore-apply', () => {
+  if (!pendingRestore) throw new Error('No backup picked');
+  const { data: restored, copy } = pendingRestore;
+  pendingRestore = null;
+  if (copy) fs.copyFileSync(currentFile, path.join(dataDir, copy));
+  saveData(dataDir, restored);
+  data = restored;
+  loadError = null;
+  return { data, copy };
+});
 
 ipcMain.handle('print', (event) => new Promise((resolve) => {
   windowOf(event).webContents.print(
