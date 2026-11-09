@@ -45,8 +45,9 @@ test('US-6 holidays: add, calendar, labels, edit, persist, delete', async () => 
   await expect(form.locator('tr[data-day="4"] .label-cell')).toHaveText('SATURDAY');
   await expect(form.locator('tr[data-day="5"] .label-cell')).toHaveText('SUNDAY');
   await page.getByRole('button', { name: /RELITA BARAYA/ }).click();
-  await expect(form.locator('tr[data-day="3"] .label-cell')).toHaveCount(0); // has punches on 7/03
-  await expect(form.locator('tr[data-day="3"] td').nth(4)).toHaveText('5:00');
+  // Has punches on 7/03, but the label always wins (US-6 changed 2026-11-09).
+  await expect(form.locator('tr[data-day="3"] .label-cell')).toHaveText('REGULAR HOLIDAY');
+  await expect(form.locator('tr[data-day="3"]').getByText('5:00')).toHaveCount(0);
 
   // Edit the type.
   await page.getByRole('button', { name: 'Holidays' }).click();

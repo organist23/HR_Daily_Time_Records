@@ -37,7 +37,7 @@ describe('computeDtr', () => {
 
   it('only official hours are credited', () => {
     const punches = [];
-    for (let day = 1; day <= 7; day++) {
+    for (const day of [1, 2, 3, 6, 7, 8, 9]) { // 7 workdays: July 4/5, 2026 are a weekend
       const date = `2026-07-${String(day).padStart(2, '0')}`;
       punches.push({ acNo: '1', name: 'X', date, session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '07:00', out: '12:30' });
       punches.push({ acNo: '1', name: 'X', date, session: 'PM', onDuty: '13:00', offDuty: '17:00', in: '12:30', out: '18:00' });
@@ -124,25 +124,37 @@ describe('holiday and weekend labels', () => {
     expect(r).toMatchObject({ label: 'REGULAR HOLIDAY', amIn: '', pmOut: '', undertime: 0 });
   });
 
-  it('keeps times on a holiday with time entries', () => {
-    const r = withHolidays('14').rows[2]; // RELITA 7/03 has punches
-    expect(r.label).toBe('');
-    expect(r.pmOut).toBe('5:00');
+  it('a holiday label hides time entries and drops their credit and undertime', () => {
+    // RELITA 7/03: AM full (240 credit), PM missing arrival (240 undertime). July 1-15 without it: 3120, 240.
+    const d = withHolidays('14');
+    expect(d.rows[2]).toMatchObject({ label: 'REGULAR HOLIDAY', amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0 });
+    expect([d.credited, d.days, d.totalUndertime]).toEqual([2880, 6, 0]);
   });
 
-  it('shows times on a weekend with a punch', () => {
+  it('a weekend label hides a punch and gives no credit', () => {
     const punches = [{ acNo: '1', name: 'X', date: '2026-07-04', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:00', out: '12:00' }];
-    const r = computeDtr({ punches, year: 2026, month: 7, half: 'full', graceMinutes: 15 }).rows[3];
-    expect(r).toMatchObject({ label: '', amIn: '8:00' });
+    const d = computeDtr({ punches, year: 2026, month: 7, half: 'full', graceMinutes: 15 });
+    expect(d.rows[3]).toMatchObject({ label: 'SATURDAY', amIn: '', amOut: '' });
+    expect(d.credited).toBe(0);
   });
 
-  it('no undertime on a holiday or weekend, but worked time still counts', () => {
+  it('no credit and no undertime on a holiday or weekend', () => {
     const sat = { acNo: '1', name: 'X', date: '2026-07-04', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:00', out: '' };
     const hol = { acNo: '1', name: 'X', date: '2026-07-03', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '09:00', out: '12:00' };
     const d = computeDtr({ punches: [sat, hol], year: 2026, month: 7, half: 'full', graceMinutes: 15, holidays });
     expect(d.rows[3].undertime).toBe(0); // Saturday, departure missing
     expect(d.rows[2].undertime).toBe(0); // holiday, 1h late
-    expect(d.credited).toBe(180); // 9:00-12:00 on the holiday
+    expect([d.credited, d.totalUndertime]).toEqual([0, 0]);
+  });
+
+  it('JOANNE July: a 7/01 holiday drops one full day', () => {
+    // 6 full days (2880) + 7/09 PM (240) = 3120 → 6 days; 7/09 AM missing departure → 240 undertime.
+    const joanne = (h) => computeDtr({ punches: of('218'), year: 2026, month: 7, half: 'full', graceMinutes: 15, holidays: h });
+    const before = joanne({});
+    expect([before.credited, before.days, before.totalUndertime]).toEqual([3120, 6, 240]);
+    const after = joanne({ '2026-07-01': { date: '2026-07-01', name: 'x', type: 'Special Non-Working Holiday' } });
+    expect(after.rows[0]).toMatchObject({ label: 'SPECIAL NON-WORKING HOLIDAY', amIn: '' });
+    expect([after.credited, after.days, after.totalUndertime]).toEqual([2640, 5, 240]);
   });
 
   it('a malformed holiday entry still labels instead of crashing', () => {
@@ -199,8 +211,11 @@ describe('adjustments', () => {
     expect(ronie(cleared).rows[0]).toMatchObject({ amIn: '', undertime: 0, adjusted: ['amIn'] });
   });
 
-  it('adjusted times on a holiday show instead of the label', () => {
+  it('a holiday label hides adjusted times and their credit', () => {
+    // With the 7/01 fix: 1680, undertime 960. The holiday removes 7/01's 480 credit.
     const h = { '2026-07-01': { date: '2026-07-01', name: 'X', type: 'Local Holiday' } };
-    expect(ronie(adj, h).rows[0]).toMatchObject({ label: '', amOut: '12:00', undertime: 0 });
+    const d = ronie(adj, h);
+    expect(d.rows[0]).toMatchObject({ label: 'LOCAL HOLIDAY', amOut: '', undertime: 0, adjusted: [] });
+    expect([d.credited, d.days, d.totalUndertime]).toEqual([1200, 2, 960]);
   });
 });

@@ -50,6 +50,12 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   const closeAdjust = useCallback(() => setAdjusting(null), []);
   const isoDay = (day) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   const dayName = (day) => (day <= daysIn(year, month) ? `${MONTHS[month - 1]} ${day}, ${year}` : '');
+  // Holidays and weekends always show their label, so they open no adjust dialog.
+  const openAdjust = (day) => {
+    const { label } = result.rows[day - 1];
+    if (label) onNotice([{ ok: false, text: `${dayName(day)} is a non-working day (${label}). Its times cannot be adjusted.` }]);
+    else setAdjusting(day);
+  };
 
   const adjustCall = async (call) => {
     try {
@@ -191,11 +197,11 @@ function Preview({ data, employee, onDataChange, onNotice }) {
           {working && <span className="muted">Working…</span>}
         </div>
       </div>
-      <p className="muted hint">Click a day number on the form to adjust its times. Adjusted times are highlighted here, not on the printout.</p>
+      <p className="muted hint">Click a workday number on the form to adjust its times. Adjusted times are highlighted here, not on the printout.</p>
       <div className="page main-page">
         <DtrForm name={employee.name} periodText={periodText}
           officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge}
-          onDayClick={setAdjusting} dayName={dayName} />
+          onDayClick={openAdjust} dayName={dayName} />
       </div>
       {batch && (
         <div className="print-batch" aria-hidden="true">
