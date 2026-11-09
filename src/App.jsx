@@ -236,6 +236,19 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   );
 }
 
+const CLOCK_FORMAT = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' };
+
+// Its own component so the ticking re-renders only the clock.
+// Each tick is scheduled for the next second boundary, so seconds are never skipped by drift.
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setTimeout(() => setNow(new Date()), 1000 - now.getMilliseconds());
+    return () => clearTimeout(id);
+  }, [now]);
+  return <time className="clock muted" aria-label="Current date and time">{now.toLocaleString('en-US', CLOCK_FORMAT)}</time>;
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -244,6 +257,8 @@ export default function App() {
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
   const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
+  const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
@@ -258,6 +273,21 @@ export default function App() {
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
     }));
   }, [data]);
+
+  // Office filter and case-insensitive name or AC-No search, applied as the admin types.
+  // A leading '#' is ignored, since the list shows AC-No as '#14'.
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase().replace(/^#/, '');
+    return groups
+      .filter((g) => !officeFilter || g.office === officeFilter)
+      .map((g) => ({ ...g, employees: g.employees.filter((e) => !q || e.name.toLowerCase().includes(q) || e.acNo.toLowerCase().includes(q)) }))
+      .filter((g) => g.employees.length);
+  }, [groups, officeFilter, search]);
+
+  const open = (key) => {
+    setSelected(key);
+    setView('dtr');
+  };
 
   const employee = data && selected ? data.employees[selected] : null;
 
@@ -299,10 +329,13 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Employees DTR Analyzer</h1>
+        <div className="top-left">
+          <h1>Employees DTR Analyzer</h1>
+          <Clock />
+        </div>
         <div className="top-actions">
-          <button onClick={() => setView(view === 'dtr' ? 'holidays' : 'dtr')} disabled={!data}>
-            {view === 'dtr' ? 'Holidays' : 'DTR preview'}
+          <button onClick={() => setView(view === 'holidays' ? 'dtr' : 'holidays')} disabled={!data}>
+            {view === 'holidays' ? 'DTR preview' : 'Holidays'}
           </button>
           <button className="primary" onClick={pick} disabled={busy || !data}>
             {busy ? 'Importing…' : 'Import Excel'}
@@ -322,7 +355,18 @@ export default function App() {
           {error && <p className="err">{error}</p>}
           {!error && !data && <p className="muted">Loading…</p>}
           {data && groups.length === 0 && <p className="muted">No records yet. Import an Excel file to start.</p>}
-          {groups.map((g) => (
+          {groups.length > 0 && (
+            <div className="sidebar-filters">
+              <select aria-label="Office filter" value={officeFilter} onChange={(e) => setOfficeFilter(e.target.value)}>
+                <option value="">All offices</option>
+                {groups.map((g) => <option key={g.office} value={g.office}>{g.office}</option>)}
+              </select>
+              <input type="search" aria-label="Search name or AC-No" placeholder="Search name or AC-No"
+                value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          )}
+          {groups.length > 0 && shown.length === 0 && <p className="muted">No employees match.</p>}
+          {shown.map((g) => (
             <section key={g.office}>
               <div className="office-head">
                 <h2>{g.office}</h2>
@@ -334,10 +378,7 @@ export default function App() {
                     <button
                       className={selected === e.key ? 'emp active' : 'emp'}
                       aria-pressed={selected === e.key}
-                      onClick={() => {
-                        setSelected(e.key);
-                        setView('dtr');
-                      }}
+                      onClick={() => open(e.key)}
                     >
                       <span>{e.name}</span>
                       <span className="muted">#{e.acNo}</span>

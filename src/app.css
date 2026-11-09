@@ -81,3 +81,7 @@ button.danger { color: var(--danger); border-color: var(--danger); }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-row input { width: 180px; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+.sidebar-filters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.top-left { display: flex; align-items: baseline; gap: 16px; }
+.clock { font-size: 13px; }
