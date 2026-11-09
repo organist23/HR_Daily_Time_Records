@@ -256,7 +256,8 @@ story can change another). Apply each row that matches.
    Data the reverted code wrote is the user's decision.
 
 **2. Impact.** Read `spec.md`, `roadmap.md`, the code and callers in the
-affected files, their tests, the latest `docs/test-results/`, and the schema.
+affected files, their tests, the latest `docs/test-results/` (or older root `PHASE-*-TEST-RESULTS.md`),
+and the schema.
 List the affected stories, the phases that shipped them (the "Shipped as" lines
 in `roadmap.md`), the modules, tables, APIs, existing data, and their E2E specs
 (feature and critical workflow). Show the user this list, the classification,
