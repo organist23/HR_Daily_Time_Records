@@ -62,6 +62,9 @@ export const isDayKeyOf = (key, office, acNo) => {
   return key.startsWith(prefix) && /^\d{4}-\d{2}-\d{2}\|(AM|PM)$/.test(key.slice(prefix.length));
 };
 
+// Adjustments are stored per session (…|date|AM, …|date|PM). This counts the days they cover.
+export const adjustedDayCount = (keys) => new Set(keys.map((k) => k.slice(0, k.lastIndexOf('|')))).size;
+
 // Label of a holiday (its type) or weekend for an ISO date, or '' for a workday.
 export function offDayLabel(date, holidays = {}) {
   const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;

@@ -205,12 +205,16 @@ export function readBackup(text) {
   const timeOrBlank = (v) => v === '' || time(v);
   const flag = (v) => v === undefined || v === true;
 
+  // Same limits as the app's own edits: office names unique ignoring case, no '|' in names or AC-Nos.
+  const seen = new Set();
   for (const [k, o] of Object.entries(d.offices)) {
-    if (!isMap(o) || !k || k.includes('|') || k === '__proto__' || o.name !== k || !Number.isInteger(o.graceMinutes)
-      || o.graceMinutes < 0 || o.graceMinutes > 60 || !(o.inCharge === undefined || str(o.inCharge, 100)) || !flag(o.archived)) fail('office', k);
+    if (!isMap(o) || !k || k.includes('|') || k === '__proto__' || o.name !== k || seen.has(k.toLowerCase())
+      || !Number.isInteger(o.graceMinutes) || o.graceMinutes < 0 || o.graceMinutes > 60
+      || !(o.inCharge === undefined || str(o.inCharge, 100)) || !flag(o.archived)) fail('office', k);
+    seen.add(k.toLowerCase());
   }
   for (const [k, e] of Object.entries(d.employees)) {
-    if (!isMap(e) || !Object.hasOwn(d.offices, e.office) || !str(e.acNo) || !e.acNo || !str(e.name)
+    if (!isMap(e) || !Object.hasOwn(d.offices, e.office) || !str(e.acNo) || !e.acNo || e.acNo.includes('|') || !str(e.name)
       || k !== `${e.office}|${e.acNo}` || !flag(e.archived)) fail('employee', k);
   }
   // Day keys are office|acNo|date|session, and the employee must exist.
@@ -225,11 +229,26 @@ export function readBackup(text) {
       || !timeOrBlank(p.in) || !timeOrBlank(p.out)) fail('punch', k);
   }
   for (const [k, a] of Object.entries(d.adjustments)) {
-    if (!dayKey(k) || !isMap(a) || !timeOrBlank(a.in) || !timeOrBlank(a.out) || !time(a.onDuty) || !time(a.offDuty)
-      || !str(a.reason) || !str(a.at, 40)) fail('adjustment', k);
+    // Adjustments on holidays and weekends are allowed: they stay stored when a holiday is added later (Phase 6).
+    if (!dayKey(k) || !isMap(a) || !timeOrBlank(a.in) || !timeOrBlank(a.out) || (a.in && a.out && a.out <= a.in)
+      || !time(a.onDuty) || !time(a.offDuty) || !str(a.reason) || !str(a.at, 40)) fail('adjustment', k);
   }
   for (const [k, h] of Object.entries(d.holidays)) {
     if (!isIsoDate(k) || !isMap(h) || h.date !== k || !str(h.name, 100) || !h.name || !HOLIDAY_TYPES.includes(h.type)) fail('holiday', k);
   }
-  return { data: d, savedAt: String(file.savedAt ?? '') };
+
+  // Rebuilt from the checked fields only, so nothing else in the file is ever saved.
+  const each = (map, pick) => Object.fromEntries(Object.entries(map).map(([k, v]) => [k, pick(v)]));
+  const opt = (v, key) => (v[key] === undefined ? {} : { [key]: v[key] });
+  const data = {
+    version: 1,
+    offices: each(d.offices, (o) => ({ name: o.name, graceMinutes: o.graceMinutes, ...opt(o, 'inCharge'), ...opt(o, 'archived') })),
+    employees: each(d.employees, (e) => ({ office: e.office, acNo: e.acNo, name: e.name, ...opt(e, 'archived') })),
+    punches: each(d.punches, (p) => ({
+      acNo: p.acNo, name: p.name, date: p.date, session: p.session, onDuty: p.onDuty, offDuty: p.offDuty, in: p.in, out: p.out, office: p.office,
+    })),
+    adjustments: each(d.adjustments, (a) => ({ in: a.in, out: a.out, onDuty: a.onDuty, offDuty: a.offDuty, reason: a.reason, at: a.at })),
+    holidays: each(d.holidays, (h) => ({ date: h.date, name: h.name, type: h.type })),
+  };
+  return { data, savedAt: String(file.savedAt ?? '') };
 }

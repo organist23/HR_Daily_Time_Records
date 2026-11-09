@@ -7,6 +7,7 @@ import {
   loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
   setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup,
 } from '../src/lib/store.js';
+import { adjustedDayCount } from '../src/lib/dtr.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
@@ -108,6 +109,7 @@ const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const pad = (n) => String(n).padStart(2, '0');
 let pendingRestore = null; // { data, copy } checked by readBackup; the renderer never sends data to restore
 const currentFile = path.join(dataDir, 'dtr-data.json');
+const copyName = (t) => `dtr-data-before-restore-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
 
 ipcMain.handle('backup', async (event) => {
   if (loadError) throw new Error(loadError);
@@ -132,15 +134,16 @@ ipcMain.handle('restore-pick', async (event) => {
   const file = res.filePaths[0];
   if (fs.statSync(file).size > MAX_BACKUP_BYTES) throw new Error('Invalid backup: file is larger than 50 MB');
   const { data: restored, savedAt } = readBackup(fs.readFileSync(file, 'utf8'));
-  const t = new Date();
-  // No copy when there is no data file yet (first run).
-  const copy = !fs.existsSync(currentFile) ? null : `dtr-data-before-restore-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
+  // The copy name shown in the confirmation. No copy when there is no data file yet (first run).
+  const copy = fs.existsSync(currentFile) ? copyName(new Date()) : null;
   pendingRestore = { data: restored, copy };
   const count = (m) => Object.keys(restored[m]).length;
-  const adjustedDays = new Set(Object.keys(restored.adjustments).map((k) => k.slice(0, k.lastIndexOf('|')))).size;
   return {
     file: path.basename(file), savedAt, copy,
-    counts: { offices: count('offices'), employees: count('employees'), punches: count('punches'), adjustedDays, holidays: count('holidays') },
+    counts: {
+      offices: count('offices'), employees: count('employees'), punches: count('punches'),
+      adjustedDays: adjustedDayCount(Object.keys(restored.adjustments)), holidays: count('holidays'),
+    },
   };
 });
 
@@ -149,13 +152,20 @@ ipcMain.handle('restore-cancel', () => {
 });
 
 // Copies the current data file byte for byte, then replaces the data with the checked backup.
+// The picked backup stays until the restore succeeds, so a failed one can be retried.
 ipcMain.handle('restore-apply', () => {
   if (!pendingRestore) throw new Error('No backup picked');
-  const { data: restored, copy } = pendingRestore;
+  let copy = null;
+  if (fs.existsSync(currentFile)) { // checked now, not at pick time
+    // Never overwrite an earlier copy: add -2, -3, … when the name is taken.
+    const base = (pendingRestore.copy ?? copyName(new Date())).replace(/\.json$/, '');
+    copy = `${base}.json`;
+    for (let n = 2; fs.existsSync(path.join(dataDir, copy)); n++) copy = `${base}-${n}.json`;
+    fs.copyFileSync(currentFile, path.join(dataDir, copy), fs.constants.COPYFILE_EXCL);
+  }
+  saveData(dataDir, pendingRestore.data);
+  data = pendingRestore.data;
   pendingRestore = null;
-  if (copy) fs.copyFileSync(currentFile, path.join(dataDir, copy));
-  saveData(dataDir, restored);
-  data = restored;
   loadError = null;
   return { data, copy };
 });

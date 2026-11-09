@@ -133,6 +133,16 @@ test('US-12 backup, delete everything, restore with a copy first, reject bad fil
     expect(copies(dir)).toHaveLength(1);
     expect(dataFile(dir)).toBe(restored);
     await expect(employeeButtons(page)).toHaveCount(10);
+
+    // A second restore adds a second copy and never overwrites the first.
+    const firstCopy = copies(dir)[0];
+    const firstCopyText = fs.readFileSync(path.join(dir, firstCopy), 'utf8');
+    await mockOpen(app, backupPath);
+    await page.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('alertdialog', { name: 'Restore backup' }).getByRole('button', { name: 'Restore' }).click();
+    await expect(page.getByRole('status')).toContainText('Restored the backup.');
+    expect(copies(dir)).toHaveLength(2);
+    expect(fs.readFileSync(path.join(dir, firstCopy), 'utf8')).toBe(firstCopyText);
   } finally {
     await app.close();
   }

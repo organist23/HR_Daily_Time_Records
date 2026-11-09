@@ -427,7 +427,26 @@ describe('backup and restore', () => {
     ['adjustment of an unknown employee', () => broken((f, d) => { d.adjustments['HRMO|999|2026-07-01|AM'] = d.adjustments['HRMO|568|2026-07-01|AM']; }), /Invalid backup: adjustment \(HRMO\|999/],
     ['holiday with a bad type', () => broken((f, d) => { d.holidays['2026-07-03'].type = 'Party'; }), /Invalid backup: holiday \(2026-07-03\)/],
     ['a __proto__ key', () => broken((f, d) => { d.holidays = JSON.parse('{"__proto__":{"date":"x"}}'); }), /Invalid backup: holiday \(__proto__\)/],
+    ['offices differing only by case', () => broken((f, d) => { d.offices.hrmo = { name: 'hrmo', graceMinutes: 15 }; }), /Invalid backup: office \(hrmo\)/],
+    ['an AC-No with |', () => broken((f, d) => { d.employees['HRMO|1|2'] = { office: 'HRMO', acNo: '1|2', name: 'X' }; }), /Invalid backup: employee \(HRMO\|1\|2\)/],
+    ['an adjustment ending before it starts', () => broken((f, d) => { d.adjustments['HRMO|568|2026-07-01|AM'].out = '07:00'; }), /Invalid backup: adjustment \(HRMO\|568\|2026-07-01\|AM\)/],
   ])('rejects %s', (_, file, err) => {
     expect(() => readBackup(file())).toThrow(err);
+  });
+
+  it('keeps only known fields', () => {
+    const text = broken((f, d) => {
+      d.extra = 'x'.repeat(1000);
+      d.punches['HRMO|14|2026-07-01|AM'].junk = 1;
+      d.offices.HRMO.junk = 1;
+    });
+    const { data } = readBackup(text);
+    expect(data).toEqual(full());
+  });
+
+  it('accepts an adjustment on a day that later became a holiday (kept by Phase 6)', () => {
+    const data = full();
+    setHoliday(data, { date: '2026-07-01', name: 'Later', type: 'Local Holiday' });
+    expect(readBackup(makeBackup(data, SAVED)).data.adjustments['HRMO|568|2026-07-01|AM']).toBeDefined();
   });
 });

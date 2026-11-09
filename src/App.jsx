@@ -6,7 +6,7 @@ import HolidaysView from './HolidaysView.jsx';
 import AdjustDialog from './AdjustDialog.jsx';
 import ArchivedView from './ArchivedView.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { MONTHS, computeDtr, daysIn, effectivePunches, isDayKeyOf, officialHours, periodLabel } from './lib/dtr.js';
+import { MONTHS, adjustedDayCount, computeDtr, daysIn, effectivePunches, isDayKeyOf, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
@@ -271,7 +271,7 @@ export default function App() {
   const [view, setView] = useState('dtr'); // 'dtr' | 'holidays' | 'archived'
   const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
   const [search, setSearch] = useState('');
-  const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, run } for a delete
+  const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, busyLabel?, run, onCancel? } for a delete or restore
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
@@ -315,7 +315,6 @@ export default function App() {
 
   // Counts for delete confirmations. Adjustments are stored per session, so they are counted as days.
   const keysOf = (obj, match) => Object.keys(obj ?? {}).filter(match);
-  const days = (keys) => new Set(keys.map((k) => k.slice(0, k.lastIndexOf('|')))).size;
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   // Archive and restore are reversible, so they run at once and report in the status bar.
@@ -351,7 +350,7 @@ export default function App() {
       const mine = (k) => isDayKeyOf(k, e.office, e.acNo);
       askDelete('Delete employee',
         `Delete ${e.name} (#${e.acNo}) from ${e.office}? This removes ${plural(keysOf(data.punches, mine).length, 'punch', 'punches')}`
-          + ` and ${plural(days(keysOf(data.adjustments, mine)), 'adjusted day', 'adjusted days')}. This cannot be undone.`,
+          + ` and ${plural(adjustedDayCount(keysOf(data.adjustments, mine)), 'adjusted day', 'adjusted days')}. This cannot be undone.`,
         'Delete employee', () => window.api.deleteEmployee({ office: e.office, acNo: e.acNo }), `Deleted ${e.name} (#${e.acNo}).`);
     },
     deleteOffice: (office) => {
@@ -359,15 +358,16 @@ export default function App() {
       askDelete('Delete office',
         `Delete office ${office}? This removes ${plural(keysOf(data.employees, ours).length, 'employee', 'employees')}`
           + `, ${plural(keysOf(data.punches, ours).length, 'punch', 'punches')}`
-          + `, ${plural(days(keysOf(data.adjustments, ours)), 'adjusted day', 'adjusted days')}, and its settings. Holidays stay. This cannot be undone.`,
+          + `, ${plural(adjustedDayCount(keysOf(data.adjustments, ours)), 'adjusted day', 'adjusted days')}, and its settings. Holidays stay. This cannot be undone.`,
         'Delete office', () => window.api.deleteOffice(office), `Deleted office ${office}.`);
     },
   };
   // A restore confirmation also tells main to drop the picked backup.
-  const closeConfirm = () => {
+  // Stable while the same dialog is open, so its Escape listener is not re-added on every render.
+  const closeConfirm = useCallback(() => {
     confirm?.onCancel?.();
     setConfirm(null);
-  };
+  }, [confirm]);
 
   const backup = async () => {
     try {
