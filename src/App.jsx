@@ -4,6 +4,7 @@ import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
 import HolidaysView from './HolidaysView.jsx';
 import AdjustDialog from './AdjustDialog.jsx';
+import DateCheckView from './DateCheckView.jsx';
 import { MONTHS, computeDtr, daysIn, effectivePunches, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
@@ -236,6 +237,18 @@ function Preview({ data, employee, onDataChange, onNotice }) {
   );
 }
 
+const CLOCK_FORMAT = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' };
+
+// Its own component so the ticking re-renders only the clock.
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <time className="clock muted" aria-label="Current date and time">{now.toLocaleString('en-US', CLOCK_FORMAT)}</time>;
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -243,7 +256,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
-  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
+  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays' | 'date'
+  const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
@@ -258,6 +273,20 @@ export default function App() {
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
     }));
   }, [data]);
+
+  // Office filter and case-insensitive name or AC-No search, applied as the admin types.
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groups
+      .filter((g) => !officeFilter || g.office === officeFilter)
+      .map((g) => ({ ...g, employees: g.employees.filter((e) => !q || e.name.toLowerCase().includes(q) || e.acNo.toLowerCase().includes(q)) }))
+      .filter((g) => g.employees.length);
+  }, [groups, officeFilter, search]);
+
+  const open = (key) => {
+    setSelected(key);
+    setView('dtr');
+  };
 
   const employee = data && selected ? data.employees[selected] : null;
 
@@ -299,10 +328,16 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Employees DTR Analyzer</h1>
+        <div className="top-left">
+          <h1>Employees DTR Analyzer</h1>
+          <Clock />
+        </div>
         <div className="top-actions">
-          <button onClick={() => setView(view === 'dtr' ? 'holidays' : 'dtr')} disabled={!data}>
-            {view === 'dtr' ? 'Holidays' : 'DTR preview'}
+          <button onClick={() => setView(view === 'date' ? 'dtr' : 'date')} disabled={!data}>
+            {view === 'date' ? 'DTR preview' : 'Date check'}
+          </button>
+          <button onClick={() => setView(view === 'holidays' ? 'dtr' : 'holidays')} disabled={!data}>
+            {view === 'holidays' ? 'DTR preview' : 'Holidays'}
           </button>
           <button className="primary" onClick={pick} disabled={busy || !data}>
             {busy ? 'Importing…' : 'Import Excel'}
@@ -322,7 +357,18 @@ export default function App() {
           {error && <p className="err">{error}</p>}
           {!error && !data && <p className="muted">Loading…</p>}
           {data && groups.length === 0 && <p className="muted">No records yet. Import an Excel file to start.</p>}
-          {groups.map((g) => (
+          {groups.length > 0 && (
+            <div className="sidebar-filters">
+              <select aria-label="Office filter" value={officeFilter} onChange={(e) => setOfficeFilter(e.target.value)}>
+                <option value="">All offices</option>
+                {groups.map((g) => <option key={g.office} value={g.office}>{g.office}</option>)}
+              </select>
+              <input type="search" aria-label="Search name or AC-No" placeholder="Search name or AC-No"
+                value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          )}
+          {groups.length > 0 && shown.length === 0 && <p className="muted">No employees match.</p>}
+          {shown.map((g) => (
             <section key={g.office}>
               <div className="office-head">
                 <h2>{g.office}</h2>
@@ -334,10 +380,7 @@ export default function App() {
                     <button
                       className={selected === e.key ? 'emp active' : 'emp'}
                       aria-pressed={selected === e.key}
-                      onClick={() => {
-                        setSelected(e.key);
-                        setView('dtr');
-                      }}
+                      onClick={() => open(e.key)}
                     >
                       <span>{e.name}</span>
                       <span className="muted">#{e.acNo}</span>
@@ -355,6 +398,9 @@ export default function App() {
               onSave={(h, originalDate) => holidayCall(() => window.api.saveHoliday(h, originalDate))}
               onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
             />
+          )}
+          {view === 'date' && data && (
+            <DateCheckView data={data} offices={groups.map((g) => g.office)} onOpen={open} />
           )}
           {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
           <div hidden={view !== 'dtr'}>
