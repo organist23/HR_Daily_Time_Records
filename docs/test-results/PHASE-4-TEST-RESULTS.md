@@ -44,6 +44,8 @@
 
 ## Mutation checks
 
+Line numbers are from the run they were taken in. The first 6 E2E rows predate the review-fix test lines.
+
 | Mutation | Red |
 |---|---|
 | `checkDate` ignores adjustments | 1 unit |
