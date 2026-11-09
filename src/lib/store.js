@@ -175,3 +175,80 @@ export function revertDay(data, { office, acNo, date }) {
   keys.forEach((k) => delete next[k]);
   data.adjustments = next;
 }
+
+const BACKUP_FORMAT = 'dtr-analyzer-backup';
+
+// The whole store as one backup file.
+export function makeBackup(data, savedAt) {
+  return JSON.stringify({ format: BACKUP_FORMAT, version: 1, savedAt, data });
+}
+
+// Parses and checks every record of a backup file. Throws 'Invalid backup: …' on the first problem,
+// so a restore never applies a partly valid file.
+export function readBackup(text) {
+  let file;
+  try {
+    file = JSON.parse(text);
+  } catch {
+    throw new Error('Invalid backup: not a JSON file');
+  }
+  const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isMap(file) || file.format !== BACKUP_FORMAT) throw new Error('Invalid backup: not a DTR Analyzer backup');
+  if (file.version !== 1 || !isMap(file.data) || file.data.version !== 1) throw new Error('Invalid backup: unsupported version');
+  const d = file.data;
+  for (const m of ['offices', 'employees', 'punches', 'adjustments', 'holidays']) {
+    if (!isMap(d[m])) throw new Error(`Invalid backup: ${m} is missing or not a list`);
+  }
+  const fail = (what, key) => { throw new Error(`Invalid backup: ${what} (${key})`); };
+  const str = (v, max = 200) => typeof v === 'string' && v.length <= max;
+  const time = (v) => typeof v === 'string' && HHMM.test(v);
+  const timeOrBlank = (v) => v === '' || time(v);
+  const flag = (v) => v === undefined || v === true;
+
+  // Same limits as the app's own edits: office names unique ignoring case, no '|' in names or AC-Nos.
+  const seen = new Set();
+  for (const [k, o] of Object.entries(d.offices)) {
+    if (!isMap(o) || !k || k.includes('|') || k === '__proto__' || o.name !== k || seen.has(k.toLowerCase())
+      || !Number.isInteger(o.graceMinutes) || o.graceMinutes < 0 || o.graceMinutes > 60
+      || !(o.inCharge === undefined || str(o.inCharge, 100)) || !flag(o.archived)) fail('office', k);
+    seen.add(k.toLowerCase());
+  }
+  for (const [k, e] of Object.entries(d.employees)) {
+    if (!isMap(e) || !Object.hasOwn(d.offices, e.office) || !str(e.acNo) || !e.acNo || e.acNo.includes('|') || !str(e.name)
+      || k !== `${e.office}|${e.acNo}` || !flag(e.archived)) fail('employee', k);
+  }
+  // Day keys are office|acNo|date|session, and the employee must exist.
+  const dayKey = (k) => {
+    const m = /^(.*)\|(\d{4}-\d{2}-\d{2})\|(AM|PM)$/.exec(k);
+    return m && Object.hasOwn(d.employees, m[1]) && isIsoDate(m[2]) ? { emp: d.employees[m[1]], date: m[2], session: m[3] } : null;
+  };
+  for (const [k, p] of Object.entries(d.punches)) {
+    const day = dayKey(k);
+    if (!day || !isMap(p) || p.office !== day.emp.office || p.acNo !== day.emp.acNo || p.date !== day.date
+      || p.session !== day.session || !str(p.name) || !time(p.onDuty) || !time(p.offDuty)
+      || !timeOrBlank(p.in) || !timeOrBlank(p.out)) fail('punch', k);
+  }
+  for (const [k, a] of Object.entries(d.adjustments)) {
+    // Adjustments on holidays and weekends are allowed: they stay stored when a holiday is added later (Phase 6).
+    if (!dayKey(k) || !isMap(a) || !timeOrBlank(a.in) || !timeOrBlank(a.out) || (a.in && a.out && a.out <= a.in)
+      || !time(a.onDuty) || !time(a.offDuty) || !str(a.reason) || !str(a.at, 40)) fail('adjustment', k);
+  }
+  for (const [k, h] of Object.entries(d.holidays)) {
+    if (!isIsoDate(k) || !isMap(h) || h.date !== k || !str(h.name, 100) || !h.name || !HOLIDAY_TYPES.includes(h.type)) fail('holiday', k);
+  }
+
+  // Rebuilt from the checked fields only, so nothing else in the file is ever saved.
+  const each = (map, pick) => Object.fromEntries(Object.entries(map).map(([k, v]) => [k, pick(v)]));
+  const opt = (v, key) => (v[key] === undefined ? {} : { [key]: v[key] });
+  const data = {
+    version: 1,
+    offices: each(d.offices, (o) => ({ name: o.name, graceMinutes: o.graceMinutes, ...opt(o, 'inCharge'), ...opt(o, 'archived') })),
+    employees: each(d.employees, (e) => ({ office: e.office, acNo: e.acNo, name: e.name, ...opt(e, 'archived') })),
+    punches: each(d.punches, (p) => ({
+      acNo: p.acNo, name: p.name, date: p.date, session: p.session, onDuty: p.onDuty, offDuty: p.offDuty, in: p.in, out: p.out, office: p.office,
+    })),
+    adjustments: each(d.adjustments, (a) => ({ in: a.in, out: a.out, onDuty: a.onDuty, offDuty: a.offDuty, reason: a.reason, at: a.at })),
+    holidays: each(d.holidays, (h) => ({ date: h.date, name: h.name, type: h.type })),
+  };
+  return { data, savedAt: String(file.savedAt ?? '') };
+}

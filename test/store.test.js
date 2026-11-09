@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay, setArchived, deleteEmployee, deleteOffice } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay, setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup } from '../src/lib/store.js';
 import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
@@ -382,5 +382,71 @@ describe('archive and delete', () => {
     expect(count(data.punches, 'HRMO|')).toBe(168);
     expect(count(data.adjustments, 'HRMO|')).toBe(2);
     expect(Object.keys(data.holidays)).toEqual(['2026-07-03']);
+  });
+});
+
+describe('backup and restore', () => {
+  const SAVED = '2026-11-09T12:00:00.000Z';
+  const full = () => {
+    const data = emptyData();
+    mergeImport(data, 'HRMO', hrmo());
+    setHoliday(data, { date: '2026-07-03', name: 'Test Holiday', type: 'Regular Holiday' });
+    adjustDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01', am: { in: '08:00', out: '12:00' }, pm: { in: '13:00', out: '17:00' }, reason: 'WFH' }, SAVED);
+    setArchived(data, { office: 'HRMO', acNo: '2025204', archived: true });
+    updateOffice(data, 'HRMO', { inCharge: 'JUAN DELA CRUZ', graceMinutes: 10 });
+    return data;
+  };
+  // Edits one part of a valid backup, to check each rule on otherwise good data.
+  const broken = (edit) => {
+    const file = JSON.parse(makeBackup(full(), SAVED));
+    edit(file, file.data);
+    return JSON.stringify(file);
+  };
+
+  it('round-trips everything', () => {
+    const data = full();
+    const back = readBackup(makeBackup(data, SAVED));
+    expect(back.savedAt).toBe(SAVED);
+    expect(back.data).toEqual(data);
+    expect(Object.keys(back.data.punches)).toHaveLength(154);
+    expect(Object.keys(back.data.adjustments)).toHaveLength(2);
+    expect(back.data.employees['HRMO|2025204'].archived).toBe(true);
+    expect(back.data.offices.HRMO).toMatchObject({ inCharge: 'JUAN DELA CRUZ', graceMinutes: 10 });
+  });
+
+  it.each([
+    ['not JSON', () => '{"format":', /Invalid backup: not a JSON file/],
+    ['another JSON file', () => JSON.stringify({ hello: 1 }), /Invalid backup: not a DTR Analyzer backup/],
+    ['wrong version', () => broken((f) => { f.version = 2; }), /Invalid backup: unsupported version/],
+    ['a map is not an object', () => broken((f, d) => { d.punches = []; }), /Invalid backup: punches/],
+    ['office grace out of range', () => broken((f, d) => { d.offices.HRMO.graceMinutes = 99; }), /Invalid backup: office \(HRMO\)/],
+    ['office name with |', () => broken((f, d) => { d.offices['A|B'] = { name: 'A|B', graceMinutes: 15 }; }), /Invalid backup: office \(A\|B\)/],
+    ['employee of a missing office', () => broken((f, d) => { d.employees['NOPE|1'] = { office: 'NOPE', acNo: '1', name: 'X' }; }), /Invalid backup: employee \(NOPE\|1\)/],
+    ['punch key and fields disagree', () => broken((f, d) => { d.punches['HRMO|14|2026-07-01|AM'].date = '2026-07-02'; }), /Invalid backup: punch \(HRMO\|14\|2026-07-01\|AM\)/],
+    ['punch with a bad time', () => broken((f, d) => { d.punches['HRMO|14|2026-07-01|AM'].in = '25:00'; }), /Invalid backup: punch/],
+    ['adjustment of an unknown employee', () => broken((f, d) => { d.adjustments['HRMO|999|2026-07-01|AM'] = d.adjustments['HRMO|568|2026-07-01|AM']; }), /Invalid backup: adjustment \(HRMO\|999/],
+    ['holiday with a bad type', () => broken((f, d) => { d.holidays['2026-07-03'].type = 'Party'; }), /Invalid backup: holiday \(2026-07-03\)/],
+    ['a __proto__ key', () => broken((f, d) => { d.holidays = JSON.parse('{"__proto__":{"date":"x"}}'); }), /Invalid backup: holiday \(__proto__\)/],
+    ['offices differing only by case', () => broken((f, d) => { d.offices.hrmo = { name: 'hrmo', graceMinutes: 15 }; }), /Invalid backup: office \(hrmo\)/],
+    ['an AC-No with |', () => broken((f, d) => { d.employees['HRMO|1|2'] = { office: 'HRMO', acNo: '1|2', name: 'X' }; }), /Invalid backup: employee \(HRMO\|1\|2\)/],
+    ['an adjustment ending before it starts', () => broken((f, d) => { d.adjustments['HRMO|568|2026-07-01|AM'].out = '07:00'; }), /Invalid backup: adjustment \(HRMO\|568\|2026-07-01\|AM\)/],
+  ])('rejects %s', (_, file, err) => {
+    expect(() => readBackup(file())).toThrow(err);
+  });
+
+  it('keeps only known fields', () => {
+    const text = broken((f, d) => {
+      d.extra = 'x'.repeat(1000);
+      d.punches['HRMO|14|2026-07-01|AM'].junk = 1;
+      d.offices.HRMO.junk = 1;
+    });
+    const { data } = readBackup(text);
+    expect(data).toEqual(full());
+  });
+
+  it('accepts an adjustment on a day that later became a holiday (kept by Phase 6)', () => {
+    const data = full();
+    setHoliday(data, { date: '2026-07-01', name: 'Later', type: 'Local Holiday' });
+    expect(readBackup(makeBackup(data, SAVED)).data.adjustments['HRMO|568|2026-07-01|AM']).toBeDefined();
   });
 });

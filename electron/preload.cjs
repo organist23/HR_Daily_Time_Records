@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('api', {
   setArchived: (target) => ipcRenderer.invoke('set-archived', target),
   deleteEmployee: (emp) => ipcRenderer.invoke('delete-employee', emp),
   deleteOffice: (office) => ipcRenderer.invoke('delete-office', office),
+  backup: () => ipcRenderer.invoke('backup'),
+  restorePick: () => ipcRenderer.invoke('restore-pick'),
+  restoreCancel: () => ipcRenderer.invoke('restore-cancel'),
+  restoreApply: () => ipcRenderer.invoke('restore-apply'),
   print: () => ipcRenderer.invoke('print'),
   exportPdf: (suggestedName) => ipcRenderer.invoke('export-pdf', suggestedName),
 });

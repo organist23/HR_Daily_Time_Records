@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import {
   loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
-  setArchived, deleteEmployee, deleteOffice,
+  setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup,
 } from '../src/lib/store.js';
+import { adjustedDayCount } from '../src/lib/dtr.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
@@ -102,6 +103,72 @@ ipcMain.handle('delete-employee', (_event, target) => {
 ipcMain.handle('delete-office', (_event, office) => mutate((d) => deleteOffice(d, String(office))));
 
 const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
+
+// Backup and restore. Main writes only to the path picked in the save dialog and to a copy inside the data folder.
+const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
+const pad = (n) => String(n).padStart(2, '0');
+let pendingRestore = null; // { data, copy } checked by readBackup; the renderer never sends data to restore
+const currentFile = path.join(dataDir, 'dtr-data.json');
+const copyName = (t) => `dtr-data-before-restore-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
+
+ipcMain.handle('backup', async (event) => {
+  if (loadError) throw new Error(loadError);
+  const t = new Date();
+  const res = await dialog.showSaveDialog(windowOf(event), {
+    defaultPath: path.join(app.getPath('documents'), `DTR-backup-${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}.json`),
+    filters: [{ name: 'DTR backup', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePath) return null;
+  fs.writeFileSync(res.filePath, makeBackup(data, t.toISOString()));
+  return { path: res.filePath };
+});
+
+// Reads and checks the picked file. Nothing changes until restore-apply.
+ipcMain.handle('restore-pick', async (event) => {
+  pendingRestore = null;
+  const res = await dialog.showOpenDialog(windowOf(event), {
+    properties: ['openFile'],
+    filters: [{ name: 'DTR backup', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  const file = res.filePaths[0];
+  if (fs.statSync(file).size > MAX_BACKUP_BYTES) throw new Error('Invalid backup: file is larger than 50 MB');
+  const { data: restored, savedAt } = readBackup(fs.readFileSync(file, 'utf8'));
+  // The copy name shown in the confirmation. No copy when there is no data file yet (first run).
+  const copy = fs.existsSync(currentFile) ? copyName(new Date()) : null;
+  pendingRestore = { data: restored, copy };
+  const count = (m) => Object.keys(restored[m]).length;
+  return {
+    file: path.basename(file), savedAt, copy,
+    counts: {
+      offices: count('offices'), employees: count('employees'), punches: count('punches'),
+      adjustedDays: adjustedDayCount(Object.keys(restored.adjustments)), holidays: count('holidays'),
+    },
+  };
+});
+
+ipcMain.handle('restore-cancel', () => {
+  pendingRestore = null;
+});
+
+// Copies the current data file byte for byte, then replaces the data with the checked backup.
+// The picked backup stays until the restore succeeds, so a failed one can be retried.
+ipcMain.handle('restore-apply', () => {
+  if (!pendingRestore) throw new Error('No backup picked');
+  let copy = null;
+  if (fs.existsSync(currentFile)) { // checked now, not at pick time
+    // Never overwrite an earlier copy: add -2, -3, … when the name is taken.
+    const base = (pendingRestore.copy ?? copyName(new Date())).replace(/\.json$/, '');
+    copy = `${base}.json`;
+    for (let n = 2; fs.existsSync(path.join(dataDir, copy)); n++) copy = `${base}-${n}.json`;
+    fs.copyFileSync(currentFile, path.join(dataDir, copy), fs.constants.COPYFILE_EXCL);
+  }
+  saveData(dataDir, pendingRestore.data);
+  data = pendingRestore.data;
+  pendingRestore = null;
+  loadError = null;
+  return { data, copy };
+});
 
 ipcMain.handle('print', (event) => new Promise((resolve) => {
   windowOf(event).webContents.print(
