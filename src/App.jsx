@@ -24,7 +24,7 @@ const NO_ADJUSTMENTS = {};
 // An employee is active unless they or their office is archived.
 const isActive = (data, emp) => Boolean(emp) && !emp.archived && !data.offices[emp.office]?.archived;
 
-// records: { archiveEmployee, deleteEmployee, archiveOffice, deleteOffice } from App, each taking the target.
+// records: archive and delete actions from App. The preview uses only the archive ones.
 function Preview({ data, employee, onDataChange, onNotice, records }) {
   const device = useMemo(() => punchesOf(data, employee), [data, employee]);
   const adjustments = data.adjustments ?? NO_ADJUSTMENTS;
@@ -197,8 +197,8 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
         <button onClick={() => setEditing(true)}>Office settings</button>
         <div className="record-actions">
           {/* Disabled during a print or PDF job: closing the preview mid-job would lose its result. */}
+          {/* No delete here: delete is offered only in the Archived view, to avoid accidents. */}
           <button disabled={working || !!batch} onClick={() => records.archiveEmployee(employee)}>Archive employee</button>
-          <button disabled={working || !!batch} className="danger" onClick={() => records.deleteEmployee(employee)}>Delete employee</button>
         </div>
         <div className="print-actions">
           <button disabled={working || !!batch} onClick={() => job('print')}>Print</button>
@@ -242,8 +242,7 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
       })()}
       {editing && (
         <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings}
-          onArchive={() => { setEditing(false); records.archiveOffice(employee.office); }}
-          onDelete={() => { setEditing(false); records.deleteOffice(employee.office); }} />
+          onArchive={() => { setEditing(false); records.archiveOffice(employee.office); }} />
       )}
     </>
   );

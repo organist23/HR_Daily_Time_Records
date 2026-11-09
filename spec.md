@@ -162,6 +162,7 @@ Withdrawn 2026-11-09: the sidebar office filter and search (US-8) are enough. Ne
 
 ### US-11: Archive and delete records
 Changed 2026-11-09: delete-import dropped (punches are not tracked per import, and re-importing a corrected file already overwrites them). Archiving an office hides its employees too (admin decision).
+Changed 2026-11-09: Delete is offered only in the Archived view, so a record must be archived first. No delete button on the DTR screen or in Office settings (admin decision, to avoid accidental deletes).
 
 **As** admin, **I want** to archive or delete employees and offices, **so that** old or duplicate data does not clutter the list (e.g. duplicate AC 2025204 "SHARMAINE BANAO").
 
@@ -169,11 +170,12 @@ Changed 2026-11-09: delete-import dropped (punches are not tracked per import, a
 - [ ] Archiving an employee hides them from the sidebar and from office print/PDF. An "Archived" view shows them and allows restoring.
 - [ ] Archiving an office hides the office and all its employees from the sidebar, the office filter, and office print/PDF. Restoring the office brings them all back.
 - [ ] Re-importing into an archived office or for an archived employee keeps them archived.
-- [ ] Deleting an employee asks for confirmation naming the employee and how many punches and adjustments go with them, then removes all of it.
-- [ ] Deleting an office asks for confirmation naming the office and its employee count, then removes the office, its employees, punches, adjustments, and settings. Holidays stay.
+- [ ] Deleting an archived employee from the Archived view asks for confirmation naming the employee and how many punches and adjusted days go with them, then removes all of it.
+- [ ] Deleting an archived office from the Archived view asks for confirmation naming the office and its employee count, then removes the office, its employees, punches, adjustments, and settings. Holidays stay.
 
 **Rejects when:**
 - [ ] Delete runs without confirmation, or Cancel changes anything.
+- [ ] A delete button appears on the DTR screen or in Office settings.
 - [ ] Archived employees appear in the default list (also US-8).
 
 ### US-12: Backup and restore

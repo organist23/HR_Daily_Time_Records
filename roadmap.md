@@ -181,9 +181,9 @@ Split from Phase 5 on 2026-11-09 (too big for one build, user decision).
 Covers US-11.
 
 - Archive and restore for employees and offices, with an Archived view
-- Delete for employees and offices, with confirmation naming what goes
+- Delete for archived employees and offices, only from the Archived view, with confirmation naming what goes
 
-**Done when:** archiving duplicate SHARMAINE BANAO (#2025204) hides them from the HRMO list and office print, restoring brings them back, and deleting the HRMO1 office removes its 11 employees and their punches after confirmation.
+**Done when:** archiving duplicate SHARMAINE BANAO (#2025204) hides them from the HRMO list and office print, restoring brings them back, the DTR screen and Office settings have no delete button, and deleting the archived HRMO1 office from Archived removes its employees and their punches after confirmation.
 
 Deliberately not built, and why: backup and restore (Phase 5b), delete-import (dropped from US-11).
 

@@ -68,7 +68,6 @@ test('US-11 archive, restore, and delete employees and offices', async () => {
     // Unsaved edits block Archive and Delete, so they are never dropped silently.
     await od.getByLabel('Grace minutes').fill('10');
     await expect(od.getByRole('button', { name: 'Archive office' })).toBeDisabled();
-    await expect(od.getByRole('button', { name: 'Delete office' })).toBeDisabled();
     await od.getByLabel('Grace minutes').fill('15');
     await od.getByRole('button', { name: 'Archive office' }).click();
     await expect(status).toContainText('Archived office HRMO1. Restore it from Archived.');
@@ -93,37 +92,50 @@ test('US-11 archive, restore, and delete employees and offices', async () => {
     const err = await page.evaluate(() => window.api.setArchived(null).then(() => 'saved', (e) => String(e.message)));
     expect(err).toContain('Unknown office: undefined');
 
-    // Delete an employee: Cancel and Escape change nothing, Confirm removes them.
+    // No delete on the DTR screen or in Office settings: delete is offered only in Archived.
     await group(page, 'HRMO1').getByRole('button', { name: /#2025204/ }).click();
-    await page.getByRole('button', { name: 'Delete employee' }).click();
+    await expect(page.getByRole('button', { name: 'Delete employee' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Office settings' }).click();
+    await expect(page.getByRole('dialog', { name: 'Office settings — HRMO1' }).getByRole('button', { name: /Delete/ })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    // Delete an archived employee from Archived: Cancel and Escape change nothing, Confirm removes them.
+    await page.getByRole('button', { name: 'Archive employee' }).click();
+    await page.getByRole('button', { name: 'Archived', exact: true }).click();
+    const delEmp = archived.getByRole('button', { name: 'Delete SHARMAINE BANAO (#2025204)' });
+    await delEmp.click();
     let dlg = page.getByRole('alertdialog', { name: 'Delete employee' });
     await expect(dlg).toContainText('Delete SHARMAINE BANAO (#2025204) from HRMO1? This removes 14 punches and 0 adjusted days. This cannot be undone.');
     await dlg.getByRole('button', { name: 'Cancel' }).click();
     await expect(dlg).toHaveCount(0);
-    await expect(list).toHaveCount(22);
-    await page.getByRole('button', { name: 'Delete employee' }).click();
+    await expect(archived).toContainText('SHARMAINE BANAO (#2025204)');
+    await delEmp.click();
     await page.keyboard.press('Escape');
     await expect(dlg).toHaveCount(0);
-    await expect(list).toHaveCount(22);
-    await page.getByRole('button', { name: 'Delete employee' }).click();
+    await expect(archived).toContainText('SHARMAINE BANAO (#2025204)');
+    await delEmp.click();
     await dlg.getByRole('button', { name: 'Delete employee' }).click();
     await expect(dlg).toHaveCount(0);
     await expect(status).toContainText('Deleted SHARMAINE BANAO (#2025204).');
+    await expect(archived).toContainText('No archived employees.');
     await expect(group(page, 'HRMO1').getByRole('button')).toHaveCount(10);
     await expect(group(page, 'HRMO').getByRole('button')).toHaveCount(11);
 
-    // Delete office HRMO1 (10 employees left, 140 punches): Cancel keeps it, Confirm removes it.
+    // Delete office HRMO1 (10 employees left, 140 punches): archive it, then delete from Archived.
     await group(page, 'HRMO1').getByRole('button', { name: /RELITA BARAYA/ }).click();
     await page.getByRole('button', { name: 'Office settings' }).click();
-    await page.getByRole('dialog', { name: 'Office settings — HRMO1' }).getByRole('button', { name: 'Delete office' }).click();
+    await page.getByRole('dialog', { name: 'Office settings — HRMO1' }).getByRole('button', { name: 'Archive office' }).click();
+    await page.getByRole('button', { name: 'Archived', exact: true }).click();
+    await expect(archived).toContainText('HRMO1 (10 employees)');
+    await archived.getByRole('button', { name: 'Delete office HRMO1' }).click();
     dlg = page.getByRole('alertdialog', { name: 'Delete office' });
     await expect(dlg).toContainText('Delete office HRMO1? This removes 10 employees, 140 punches, 0 adjusted days, and its settings. Holidays stay. This cannot be undone.');
     await dlg.getByRole('button', { name: 'Cancel' }).click();
-    await expect(list).toHaveCount(21);
-    await page.getByRole('button', { name: 'Office settings' }).click();
-    await page.getByRole('dialog', { name: 'Office settings — HRMO1' }).getByRole('button', { name: 'Delete office' }).click();
+    await expect(archived).toContainText('HRMO1 (10 employees)');
+    await archived.getByRole('button', { name: 'Delete office HRMO1' }).click();
     await dlg.getByRole('button', { name: 'Delete office' }).click();
     await expect(status).toContainText('Deleted office HRMO1.');
+    await expect(archived).toContainText('No archived offices.');
     await expect(page.getByRole('heading', { name: 'HRMO1' })).toHaveCount(0);
     await expect(list).toHaveCount(11);
     await app.close();
