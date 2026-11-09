@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('api', {
   deleteHoliday: (date) => ipcRenderer.invoke('delete-holiday', date),
   adjustDay: (day) => ipcRenderer.invoke('adjust-day', day),
   revertDay: (day) => ipcRenderer.invoke('revert-day', day),
+  setArchived: (target) => ipcRenderer.invoke('set-archived', target),
+  deleteEmployee: (emp) => ipcRenderer.invoke('delete-employee', emp),
+  deleteOffice: (office) => ipcRenderer.invoke('delete-office', office),
   print: () => ipcRenderer.invoke('print'),
   exportPdf: (suggestedName) => ipcRenderer.invoke('export-pdf', suggestedName),
 });

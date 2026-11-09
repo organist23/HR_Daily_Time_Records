@@ -4,7 +4,9 @@ import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
 import HolidaysView from './HolidaysView.jsx';
 import AdjustDialog from './AdjustDialog.jsx';
-import { MONTHS, computeDtr, daysIn, effectivePunches, officialHours, periodLabel } from './lib/dtr.js';
+import ArchivedView from './ArchivedView.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
+import { MONTHS, computeDtr, daysIn, effectivePunches, isDayKeyOf, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
@@ -19,7 +21,11 @@ const punchesOf = (data, emp) => {
 
 const NO_ADJUSTMENTS = {};
 
-function Preview({ data, employee, onDataChange, onNotice }) {
+// An employee is active unless they or their office is archived.
+const isActive = (data, emp) => Boolean(emp) && !emp.archived && !data.offices[emp.office]?.archived;
+
+// records: archive and delete actions from App. The preview uses only the archive ones.
+function Preview({ data, employee, onDataChange, onNotice, records }) {
   const device = useMemo(() => punchesOf(data, employee), [data, employee]);
   const adjustments = data.adjustments ?? NO_ADJUSTMENTS;
   // Everything shown or printed uses device punches with the admin's adjustments applied.
@@ -148,7 +154,7 @@ function Preview({ data, employee, onDataChange, onNotice }) {
       adjByEmployee.get(acNo)[k] = a;
     }
     return Object.values(data.employees)
-      .filter((e) => e.office === employee.office)
+      .filter((e) => e.office === employee.office && !e.archived)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => {
         const p = effectivePunches(byEmployee.get(e.acNo) ?? [], adjByEmployee.get(e.acNo), e.office, e.acNo);
@@ -189,6 +195,11 @@ function Preview({ data, employee, onDataChange, onNotice }) {
             onChange={(e) => setInCharge(e.target.value)} />
         </label>
         <button onClick={() => setEditing(true)}>Office settings</button>
+        <div className="record-actions">
+          {/* Disabled during a print or PDF job: closing the preview mid-job would lose its result. */}
+          {/* No delete here: delete is offered only in the Archived view, to avoid accidents. */}
+          <button disabled={working || !!batch} onClick={() => records.archiveEmployee(employee)}>Archive employee</button>
+        </div>
         <div className="print-actions">
           <button disabled={working || !!batch} onClick={() => job('print')}>Print</button>
           <button disabled={working || !!batch} onClick={() => job('pdf', employee.name)}>Export PDF</button>
@@ -230,7 +241,8 @@ function Preview({ data, employee, onDataChange, onNotice }) {
         );
       })()}
       {editing && (
-        <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings} />
+        <OfficeDialog office={employee.office} settings={settings} onSave={saveSettings} onCancel={closeSettings}
+          onArchive={() => { setEditing(false); records.archiveOffice(employee.office); }} />
       )}
     </>
   );
@@ -256,18 +268,22 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
-  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
+  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays' | 'archived'
   const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
   const [search, setSearch] = useState('');
+  const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, run } for a delete
 
   useEffect(() => {
     window.api.loadData().then(setData, (e) => setError(e.message));
   }, []);
 
+  // Active offices and employees only. Archived ones are listed in the Archived view.
   const groups = useMemo(() => {
     if (!data) return [];
     const byOffice = {};
-    for (const [key, emp] of Object.entries(data.employees)) (byOffice[emp.office] ??= []).push({ key, ...emp });
+    for (const [key, emp] of Object.entries(data.employees)) {
+      if (isActive(data, emp)) (byOffice[emp.office] ??= []).push({ key, ...emp });
+    }
     return Object.keys(byOffice).sort().map((office) => ({
       office,
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
@@ -284,12 +300,70 @@ export default function App() {
       .filter((g) => g.employees.length);
   }, [groups, officeFilter, search]);
 
+  // An office that is archived or deleted leaves the filter, so the filter goes back to all offices.
+  useEffect(() => {
+    if (officeFilter && !groups.some((g) => g.office === officeFilter)) setOfficeFilter('');
+  }, [groups, officeFilter]);
+
   const open = (key) => {
     setSelected(key);
     setView('dtr');
   };
 
-  const employee = data && selected ? data.employees[selected] : null;
+  // The preview closes when the selected employee is archived or deleted.
+  const employee = data && selected && isActive(data, data.employees[selected]) ? data.employees[selected] : null;
+
+  // Counts for delete confirmations. Adjustments are stored per session, so they are counted as days.
+  const keysOf = (obj, match) => Object.keys(obj ?? {}).filter(match);
+  const days = (keys) => new Set(keys.map((k) => k.slice(0, k.lastIndexOf('|')))).size;
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  // Archive and restore are reversible, so they run at once and report in the status bar.
+  const setArchived = async (target, archived, label) => {
+    try {
+      setData(await window.api.setArchived({ ...target, archived }));
+      setMessages([{ ok: true, text: archived ? `Archived ${label}. Restore it from Archived.` : `Restored ${label}.` }]);
+    } catch (e) {
+      setMessages([{ ok: false, text: `Could not ${archived ? 'archive' : 'restore'} ${label}: ${ipcError(e)}` }]);
+    }
+  };
+
+  // Deletes ask first. The dialog shows failures and stays open until the delete succeeds or is cancelled.
+  const askDelete = (title, message, confirmLabel, call, done) => setConfirm({
+    title, message, confirmLabel,
+    run: async () => {
+      let next;
+      try {
+        next = await call();
+      } catch (e) {
+        throw new Error(ipcError(e));
+      }
+      setData(next);
+      setConfirm(null);
+      setMessages([{ ok: true, text: done }]);
+    },
+  });
+
+  const records = {
+    archiveEmployee: (e) => setArchived({ office: e.office, acNo: e.acNo }, true, `${e.name} (#${e.acNo})`),
+    archiveOffice: (office) => setArchived({ office }, true, `office ${office}`),
+    deleteEmployee: (e) => {
+      const mine = (k) => isDayKeyOf(k, e.office, e.acNo);
+      askDelete('Delete employee',
+        `Delete ${e.name} (#${e.acNo}) from ${e.office}? This removes ${plural(keysOf(data.punches, mine).length, 'punch', 'punches')}`
+          + ` and ${plural(days(keysOf(data.adjustments, mine)), 'adjusted day', 'adjusted days')}. This cannot be undone.`,
+        'Delete employee', () => window.api.deleteEmployee({ office: e.office, acNo: e.acNo }), `Deleted ${e.name} (#${e.acNo}).`);
+    },
+    deleteOffice: (office) => {
+      const ours = (k) => k.startsWith(`${office}|`);
+      askDelete('Delete office',
+        `Delete office ${office}? This removes ${plural(keysOf(data.employees, ours).length, 'employee', 'employees')}`
+          + `, ${plural(keysOf(data.punches, ours).length, 'punch', 'punches')}`
+          + `, ${plural(days(keysOf(data.adjustments, ours)), 'adjusted day', 'adjusted days')}, and its settings. Holidays stay. This cannot be undone.`,
+        'Delete office', () => window.api.deleteOffice(office), `Deleted office ${office}.`);
+    },
+  };
+  const closeConfirm = useCallback(() => setConfirm(null), []);
 
   const pick = async () => {
     const paths = await window.api.pickExcelFiles();
@@ -317,6 +391,8 @@ export default function App() {
         ok: r.ok,
         text: r.ok
           ? `${r.file}: ${r.added} added, ${r.updated} updated, ${r.skipped} skipped (office ${r.office})`
+            // Records in an archived office stay hidden, so say where they went.
+            + (res.data.offices[r.office]?.archived ? `. Office ${r.office} is archived, see Archived.` : '')
           : `${r.file}: ${r.error}`,
       })));
     } catch (e) {
@@ -334,6 +410,9 @@ export default function App() {
           <Clock />
         </div>
         <div className="top-actions">
+          <button onClick={() => setView(view === 'archived' ? 'dtr' : 'archived')} disabled={!data}>
+            {view === 'archived' ? 'DTR preview' : 'Archived'}
+          </button>
           <button onClick={() => setView(view === 'holidays' ? 'dtr' : 'holidays')} disabled={!data}>
             {view === 'holidays' ? 'DTR preview' : 'Holidays'}
           </button>
@@ -354,7 +433,11 @@ export default function App() {
         <nav className="sidebar" aria-label="Employees">
           {error && <p className="err">{error}</p>}
           {!error && !data && <p className="muted">Loading…</p>}
-          {data && groups.length === 0 && <p className="muted">No records yet. Import an Excel file to start.</p>}
+          {data && groups.length === 0 && (
+            <p className="muted">
+              {Object.keys(data.employees).length ? 'All employees are archived. See Archived.' : 'No records yet. Import an Excel file to start.'}
+            </p>
+          )}
           {groups.length > 0 && (
             <div className="sidebar-filters">
               <select aria-label="Office filter" value={officeFilter} onChange={(e) => setOfficeFilter(e.target.value)}>
@@ -397,10 +480,14 @@ export default function App() {
               onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
             />
           )}
+          {view === 'archived' && data && (
+            <ArchivedView data={data} onRestore={(target, label) => setArchived(target, false, label)}
+              onDeleteOffice={records.deleteOffice} onDeleteEmployee={records.deleteEmployee} />
+          )}
           {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
           <div hidden={view !== 'dtr'}>
             {employee ? (
-              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} />
+              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} records={records} />
             ) : (
               <p className="muted empty-hint">Select an employee to preview their DTR.</p>
             )}
@@ -410,6 +497,10 @@ export default function App() {
 
       {pending && (
         <ImportDialog paths={pending} offices={Object.keys(data.offices)} onImport={runImport} onCancel={cancel} />
+      )}
+      {confirm && (
+        <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel}
+          onConfirm={confirm.run} onCancel={closeConfirm} />
       )}
     </div>
   );

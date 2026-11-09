@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
 import useDialogKeys from './useDialogKeys.js';
 
-export default function OfficeDialog({ office, settings, onSave, onCancel }) {
+// onArchive closes this dialog first. Delete is offered only in the Archived view.
+export default function OfficeDialog({ office, settings, onSave, onCancel, onArchive }) {
   const [inCharge, setInCharge] = useState(settings.inCharge ?? '');
   const [grace, setGrace] = useState(String(settings.graceMinutes ?? 15));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const first = useRef(null);
+  const dirty = inCharge !== (settings.inCharge ?? '') || grace !== String(settings.graceMinutes ?? 15);
 
   useDialogKeys(first, onCancel, busy);
 
@@ -36,6 +38,11 @@ export default function OfficeDialog({ office, settings, onSave, onCancel }) {
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <div className="actions">
+          {/* Disabled while there are unsaved edits, so leaving the dialog never drops them silently. */}
+          <button type="button" onClick={onArchive} disabled={busy || dirty} title={dirty ? 'Save or cancel your changes first' : undefined}>
+            Archive office
+          </button>
+          <span className="spacer" />
           <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
           <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         </div>

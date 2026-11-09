@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay } from '../src/lib/store.js';
+import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay, setArchived, deleteEmployee, deleteOffice } from '../src/lib/store.js';
 import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
@@ -304,5 +304,83 @@ describe('time adjustments', () => {
     revertDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01' });
     expect(data.adjustments).toEqual({});
     expect(() => revertDay(data, { office: 'HRMO', acNo: '568', date: '2026-07-01' })).toThrow('No adjustment on 2026-07-01');
+  });
+});
+
+describe('archive and delete', () => {
+  const AT = '2026-11-09T02:00:00.000Z';
+  const twoOffices = () => {
+    const data = emptyData();
+    mergeImport(data, 'HRMO', hrmo());
+    mergeImport(data, 'HR', hrmo().filter((r) => r.acNo === '14'));
+    // AC 140 in HRMO shares the "14" prefix without the separator.
+    mergeImport(data, 'HRMO', hrmo().filter((r) => r.acNo === '14').map((r) => ({ ...r, acNo: '140', name: 'X' })));
+    adjustDay(data, { office: 'HRMO', acNo: '14', date: '2026-07-01', am: { in: '08:00', out: '12:00' }, pm: {}, reason: 'WFH' }, AT);
+    adjustDay(data, { office: 'HR', acNo: '14', date: '2026-07-01', am: { in: '08:00', out: '12:00' }, pm: {}, reason: 'WFH' }, AT);
+    setHoliday(data, { date: '2026-07-03', name: 'X', type: 'Regular Holiday' });
+    return data;
+  };
+  const count = (obj, prefix) => Object.keys(obj).filter((k) => k.startsWith(prefix)).length;
+
+  it('archives and restores an employee and an office', () => {
+    const data = twoOffices();
+    setArchived(data, { office: 'HRMO', acNo: '2025204', archived: true });
+    expect(data.employees['HRMO|2025204'].archived).toBe(true);
+    setArchived(data, { office: 'HRMO', acNo: '2025204', archived: false });
+    expect(data.employees['HRMO|2025204'].archived).toBeUndefined();
+    setArchived(data, { office: 'HR', archived: true });
+    expect(data.offices.HR).toMatchObject({ name: 'HR', archived: true });
+    setArchived(data, { office: 'HR', archived: false });
+    expect(data.offices.HR.archived).toBeUndefined();
+  });
+
+  it('rejects unknown records', () => {
+    const data = twoOffices();
+    expect(() => setArchived(data, { office: 'HRMO', acNo: '999', archived: true })).toThrow('Unknown employee');
+    expect(() => setArchived(data, { office: 'NOPE', archived: true })).toThrow('Unknown office: NOPE');
+    expect(() => deleteEmployee(data, { office: 'HRMO', acNo: '999' })).toThrow('Unknown employee');
+    expect(() => deleteOffice(data, 'NOPE')).toThrow('Unknown office: NOPE');
+  });
+
+  it('a re-import keeps the archive', () => {
+    const data = twoOffices();
+    setArchived(data, { office: 'HRMO', acNo: '2025204', archived: true });
+    setArchived(data, { office: 'HR', archived: true });
+    mergeImport(data, 'HRMO', hrmo());
+    mergeImport(data, 'HR', hrmo().filter((r) => r.acNo === '14'));
+    expect(data.employees['HRMO|2025204'].archived).toBe(true);
+    expect(data.offices.HR.archived).toBe(true);
+  });
+
+  it('deletes an employee with their punches and adjustments only', () => {
+    const data = twoOffices();
+    deleteEmployee(data, { office: 'HRMO', acNo: '14' });
+    expect(data.employees['HRMO|14']).toBeUndefined();
+    expect(count(data.punches, 'HRMO|14|')).toBe(0);
+    expect(count(data.adjustments, 'HRMO|14|')).toBe(0);
+    expect(count(data.punches, 'HRMO|140|')).toBe(14);
+    expect(count(data.punches, 'HR|14|')).toBe(14);
+    expect(count(data.adjustments, 'HR|14|')).toBe(2); // AM set + PM cleared (device PM exists)
+  });
+
+  it('an AC-No containing | does not take another employee\'s punches', () => {
+    const data = twoOffices();
+    mergeImport(data, 'HRMO', hrmo().filter((r) => r.acNo === '14').map((r) => ({ ...r, acNo: '14|2', name: 'Y' })));
+    deleteEmployee(data, { office: 'HRMO', acNo: '14' });
+    expect(count(data.punches, 'HRMO|14|2|')).toBe(14);
+    expect(data.employees['HRMO|14|2']).toBeDefined();
+  });
+
+  it('deletes an office with its employees, punches, adjustments, and settings, keeping holidays', () => {
+    const data = twoOffices();
+    deleteOffice(data, 'HR');
+    expect(data.offices.HR).toBeUndefined();
+    expect(count(data.employees, 'HR|')).toBe(0);
+    expect(count(data.punches, 'HR|')).toBe(0);
+    expect(count(data.adjustments, 'HR|')).toBe(0);
+    expect(count(data.employees, 'HRMO|')).toBe(12);
+    expect(count(data.punches, 'HRMO|')).toBe(168);
+    expect(count(data.adjustments, 'HRMO|')).toBe(2);
+    expect(Object.keys(data.holidays)).toEqual(['2026-07-03']);
   });
 });

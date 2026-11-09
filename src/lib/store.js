@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOLIDAY_TYPES, offDayLabel } from './dtr.js';
+import { HOLIDAY_TYPES, offDayLabel, isDayKeyOf } from './dtr.js';
 
 const FILE = 'dtr-data.json';
 
@@ -21,13 +21,46 @@ export function mergeImport(data, office, records) {
   let added = 0;
   let updated = 0;
   for (const r of records) {
-    data.employees[`${office}|${r.acNo}`] = { office, acNo: r.acNo, name: r.name };
+    const emp = `${office}|${r.acNo}`;
+    // Keeps existing fields such as `archived` (a re-import never restores an archived employee).
+    data.employees[emp] = { ...data.employees[emp], office, acNo: r.acNo, name: r.name };
     const key = `${office}|${r.acNo}|${r.date}|${r.session}`;
     if (data.punches[key]) updated++;
     else added++;
     data.punches[key] = { ...r, office };
   }
   return { added, updated };
+}
+
+// Archives (archived: true) or restores an employee when acNo is given, otherwise the office.
+export function setArchived(data, { office, acNo, archived }) {
+  const [map, key] = acNo === undefined ? ['offices', office] : ['employees', `${office}|${acNo}`];
+  if (!Object.hasOwn(data[map], key)) throw new Error(acNo === undefined ? `Unknown office: ${office}` : 'Unknown employee');
+  const { archived: _, ...rest } = data[map][key];
+  data[map] = { ...data[map], [key]: archived ? { ...rest, archived: true } : rest };
+}
+
+// Removes every own key of obj that starts with prefix. Office names cannot contain '|', so 'HR|' never matches 'HRMO|'.
+const without = (obj, prefix) => Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => !k.startsWith(prefix)));
+
+export function deleteEmployee(data, { office, acNo }) {
+  const key = `${office}|${acNo}`;
+  if (!Object.hasOwn(data.employees, key)) throw new Error('Unknown employee');
+  const { [key]: _, ...employees } = data.employees;
+  data.employees = employees;
+  const keep = (obj) => Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => !isDayKeyOf(k, office, acNo)));
+  data.punches = keep(data.punches);
+  data.adjustments = keep(data.adjustments);
+}
+
+// Removes the office, its employees, punches, adjustments, and settings. Holidays are global and stay.
+export function deleteOffice(data, office) {
+  if (!Object.hasOwn(data.offices, office)) throw new Error(`Unknown office: ${office}`);
+  const { [office]: _, ...offices } = data.offices;
+  data.offices = offices;
+  data.employees = without(data.employees, `${office}|`);
+  data.punches = without(data.punches, `${office}|`);
+  data.adjustments = without(data.adjustments, `${office}|`);
 }
 
 export function loadData(dir) {
