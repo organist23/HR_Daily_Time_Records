@@ -79,13 +79,16 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
       const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;
       const offLabel = holiday ? String(holiday.type || 'Holiday').toUpperCase()
         : weekday === 6 ? 'SATURDAY' : weekday === 0 ? 'SUNDAY' : '';
-      for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
-        if (!offLabel) row.undertime += s.undertime; // not a workday: no undertime, worked time still counts
-        credited += s.credited;
+      if (offLabel) {
+        // Non-working day: the label always wins, with no credit and no undertime.
+        Object.assign(row, { amIn: '', amOut: '', pmIn: '', pmOut: '', adjusted: [], label: offLabel });
+      } else {
+        for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
+          row.undertime += s.undertime;
+          credited += s.credited;
+        }
+        totalUndertime += row.undertime;
       }
-      totalUndertime += row.undertime;
-      // The label shows only when the day has no times, so work on those days stays visible.
-      if (!row.amIn && !row.amOut && !row.pmIn && !row.pmOut) row.label = offLabel;
     }
     rows.push(row);
   }
