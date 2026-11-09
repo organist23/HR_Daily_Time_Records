@@ -48,13 +48,22 @@ test('US-6 a holiday on a past date with punches shows its label and drops the c
     // Weekends stay labeled.
     await expect(form.locator('tr[data-day="4"] .label-cell')).toHaveText('SATURDAY');
     await expect(form.locator('tr[data-day="5"] .label-cell')).toHaveText('SUNDAY');
+    // RONIE 7/01 (AM 8:00 arrival only, PM absent) shows no undertime under the label.
+    const ronie = page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ });
+    await ronie.click();
+    await expect(row1.locator('.label-cell')).toHaveText('SPECIAL NON-WORKING HOLIDAY');
+    await expect(row1.locator('td').nth(2)).toHaveText('');
 
-    // Deleting it brings the punches back.
+    // Deleting it brings the punches back, computed as a workday.
     await deleteJuly1Holiday(page);
     await joanne.click();
     await expect(row1.locator('.label-cell')).toHaveCount(0);
     await expect(row1.locator('td').nth(1)).toHaveText('7:34');
     await expect(form.locator('tr.total')).toContainText('6 days');
+    // RONIE 7/01: missing A.M. departure = 4h undertime again.
+    await ronie.click();
+    await expect(row1.locator('td').nth(1)).toHaveText('8:00');
+    await expect(row1.locator('td').nth(5)).toHaveText('4');
   } finally {
     await app.close();
   }
