@@ -116,7 +116,23 @@ Conventions later phases inherit:
 - Admin adjustments always win over later imports.
 - Anything that must not print gets a screen-only style plus a `@media print` reset, checked with `emulateMedia({ media: 'print' })` and then reset with `{ media: null }`.
 
-### Phase 4 — Find and check NEXT
+### Phase 6 — Non-working days always labeled NEXT
+
+Reopens Phase 2: US-6 changed (labels always win, 0 credit on holidays and weekends).
+Reopens Phase 3: US-7 changed (adjustments limited to workdays).
+Supersedes Phase 2 convention: "their label shows only when the day has no times" → the label always shows on holidays and weekends, admin decision 2026-11-09.
+
+- `computeDtr` shows the label and skips credit and undertime on holidays and weekends, even with punches or adjustments
+- Clicking a holiday or weekend day number shows a non-working-day message instead of the adjust dialog, and main rejects `adjust-day` on those dates
+- Existing adjustments on those days stay stored and show again if the holiday is deleted
+
+**Done when:** with a Special Non-Working Holiday on 7/01/2026, JOANNE M ESTRADA's July 1 row shows `SPECIAL NON-WORKING HOLIDAY` and her days total drops by that day's credit. RELITA 7/03 holiday shows the label. July 4/5 show `SATURDAY`/`SUNDAY` even with punches. Adjusting a weekend or holiday is refused. Test scope includes regression selection for US-2 totals and US-7 workday adjustments.
+
+Deliberately not built, and why: moving or deleting existing holiday/weekend adjustments (data stays, user decision), Phase 4 features.
+
+### Phase 4 — Find and check LATER
+
+Paused 2026-11-09: Phase 6 built first by user decision. Not started, so no branch. Becomes NEXT when Phase 6 is DONE.
 
 Covers US-8, US-9, US-10.
 

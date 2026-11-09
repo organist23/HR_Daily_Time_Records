@@ -26,7 +26,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Day undertime** = sum of both sessions, shown in the Hours and Minutes columns.
 - **Credited minutes** for a session with both punches = session length − late − early (minimum 0). This means time outside official hours is never credited.
 - **Days total** = floor(total credited minutes ÷ 480). It is printed in the Total row as `<n> days`. This matches the reference photo: 100h03m ÷ 8 = 12.5 → "12 days". The undertime total goes in the Total row's Undertime columns.
-- **Holidays and weekends** with no time entries: the label goes across the time cells, with 0 credit and no undertime. If the day has time entries (e.g. work from home), the times are shown and credited instead of the label, and undertime is never charged on these days (not a workday). Added 2026-11-08 from the Phase 2 review.
+- **Holidays and weekends** are non-working days. The label always goes across the time cells, with 0 credit and no undertime, even when device punches or adjustments exist on that day. Added 2026-11-08 from the Phase 2 review. Changed 2026-11-09: the label used to give way to time entries. The admin decided non-working days always show the label and add nothing to the days total.
 
 ## User Stories
 
@@ -95,24 +95,30 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - [ ] A one-print override changes the saved office default.
 
 ### US-6: Holidays and weekends
+Changed 2026-11-09: labels always win over time entries, and non-working days add no credit (admin decision, reverses the 2026-11-08 rule).
+
 **As** admin, **I want** to add, edit, and delete holidays with a type, and have weekends labeled, **so that** those rows are filled correctly.
 
 **Accepts when:**
 - [ ] Admin can add, edit, and delete a holiday with date, name, and type (Regular Holiday, Special Non-Working Holiday, Local Holiday, Work Suspension).
 - [ ] Holidays show on a calendar view.
-- [ ] In the DTR, a holiday with no time entries shows its type label across the A.M./P.M. cells, with 0 credit and no undertime.
-- [ ] Saturdays and Sundays with no time entries show `SATURDAY` / `SUNDAY` across the cells.
+- [ ] In the DTR, a holiday shows its type label across the A.M./P.M. cells, with 0 credit and no undertime, even when punches exist that day.
+- [ ] Saturdays and Sundays show `SATURDAY` / `SUNDAY` across the cells, with 0 credit and no undertime, even when punches exist that day.
+- [ ] Adding a holiday on a past date changes that day's row to the label right away.
 - [ ] Deleting a holiday makes that day's row show its punches or blank again.
 
 **Rejects when:**
 - [ ] Two holidays can be saved on the same date.
-- [ ] A label hides time entries that exist on that day.
+- [ ] A holiday or weekend row shows times or adds credit to the days total.
 
 ### US-7: Adjust times
+Changed 2026-11-09: adjustments are limited to workdays, since holiday and weekend rows always show their label (see US-6).
+
 **As** admin, **I want** to add, edit, or clear any AM/PM arrival or departure for an employee's day with a reason (e.g. work from home), **so that** the DTR shows approved adjustments.
 
 **Accepts when:**
-- [ ] Admin can set or clear each of the 4 time cells for any date in the period, including days with no punches.
+- [ ] Admin can set or clear each of the 4 time cells for any workday in the period, including days with no punches.
+- [ ] Clicking a holiday, Saturday, or Sunday row shows a message that it is a non-working day and opens no adjust dialog.
 - [ ] Each adjustment stores a reason and the date it was made. Undertime and days total recompute right away.
 - [ ] The original imported punch is kept, and the admin can revert an adjustment to it.
 - [ ] Adjusted cells are marked in the app view and are not marked on the printed page.
@@ -120,6 +126,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 **Rejects when:**
 - [ ] An invalid time is saved (e.g. `25:00`, or a departure earlier than the arrival in the same session).
 - [ ] A later re-import overwrites a manual adjustment.
+- [ ] An adjustment is saved for a holiday, Saturday, or Sunday.
 
 ### US-8: Find employees
 **As** admin, **I want** to filter by office and search by name or AC-No, **so that** I reach an employee's DTR fast.
