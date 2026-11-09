@@ -4,7 +4,6 @@ import DtrForm from './DtrForm.jsx';
 import OfficeDialog from './OfficeDialog.jsx';
 import HolidaysView from './HolidaysView.jsx';
 import AdjustDialog from './AdjustDialog.jsx';
-import DateCheckView from './DateCheckView.jsx';
 import { MONTHS, computeDtr, daysIn, effectivePunches, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
@@ -257,7 +256,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(null); // [{ ok, text }] shown in the status bar
   const [selected, setSelected] = useState(null); // employee key office|acNo
-  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays' | 'date'
+  const [view, setView] = useState('dtr'); // 'dtr' | 'holidays'
   const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
   const [search, setSearch] = useState('');
 
@@ -274,7 +273,6 @@ export default function App() {
       employees: byOffice[office].sort((a, b) => a.name.localeCompare(b.name)),
     }));
   }, [data]);
-  const offices = useMemo(() => groups.map((g) => g.office), [groups]);
 
   // Office filter and case-insensitive name or AC-No search, applied as the admin types.
   // A leading '#' is ignored, since the list shows AC-No as '#14'.
@@ -336,9 +334,6 @@ export default function App() {
           <Clock />
         </div>
         <div className="top-actions">
-          <button onClick={() => setView(view === 'date' ? 'dtr' : 'date')} disabled={!data}>
-            {view === 'date' ? 'DTR preview' : 'Date check'}
-          </button>
           <button onClick={() => setView(view === 'holidays' ? 'dtr' : 'holidays')} disabled={!data}>
             {view === 'holidays' ? 'DTR preview' : 'Holidays'}
           </button>
@@ -402,10 +397,6 @@ export default function App() {
               onDelete={(date) => holidayCall(() => window.api.deleteHoliday(date))}
             />
           )}
-          {/* Kept mounted while hidden so the picked date and office survive opening a DTR. */}
-          <div hidden={view !== 'date'}>
-            {data && <DateCheckView data={data} offices={offices} onOpen={open} />}
-          </div>
           {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
           <div hidden={view !== 'dtr'}>
             {employee ? (

@@ -48,7 +48,7 @@ input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--border)
 /* Print and PDF: only DTR pages. An office batch replaces the on-screen page. */
 @media print {
   body, .app, .body, .preview { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; }
-  .topbar, .results, .sidebar, .controls, .hint, .backdrop, .empty-hint, .holidays, .date-check { display: none !important; }
+  .topbar, .results, .sidebar, .controls, .hint, .backdrop, .empty-hint, .holidays { display: none !important; }
   .print-batch { display: block; }
   .preview:has(.print-batch) .main-page { display: none; }
 }
@@ -85,10 +85,3 @@ button.danger { color: var(--danger); border-color: var(--danger); }
 .sidebar-filters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .top-left { display: flex; align-items: baseline; gap: 16px; }
 .clock { font-size: 13px; }
-.date-check { max-width: 10in; margin: 0 auto; }
-.check-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 12px; }
-.check-table { width: 100%; border-collapse: collapse; background: var(--panel); }
-.check-table th, .check-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.check-table th { font-size: 12px; color: var(--muted); font-weight: 600; }
-.link-btn { border: 0; background: none; padding: 0; color: var(--accent); text-align: left; }
-.link-btn:hover { text-decoration: underline; }

@@ -140,6 +140,8 @@ Changed 2026-11-09: adjustments are limited to workdays, since holiday and weeke
 - [ ] Archived employees appear in the default list.
 
 ### US-9: Check a specific date
+Withdrawn 2026-11-09: the sidebar office filter and search (US-8) are enough. Never shipped.
+
 **As** admin, **I want** to pick a date and see who worked that day, **so that** I can verify attendance.
 
 **Accepts when:**

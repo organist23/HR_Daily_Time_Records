@@ -98,24 +98,6 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
   return { rows, totalUndertime, credited, days: Math.floor(credited / 480) };
 }
 
-// One row per employee for an ISO date, sorted by office then name. Adjustments win over device punches.
-// Status: the holiday/weekend label, Present (4 times), Absent (none), or Incomplete.
-export function checkDate(data, date) {
-  const label = offDayLabel(date, data.holidays);
-  const time = (key) => (data.adjustments?.[key] ?? data.punches[key]) || {};
-  return Object.entries(data.employees)
-    .map(([key, emp]) => {
-      const am = label ? {} : time(`${key}|${date}|AM`);
-      const pm = label ? {} : time(`${key}|${date}|PM`);
-      const times = { amIn: formatTime(am.in), amOut: formatTime(am.out), pmIn: formatTime(pm.in), pmOut: formatTime(pm.out) };
-      const set = Object.values(times).filter(Boolean).length;
-      const status = label || (set === 4 ? 'Present' : set === 0 ? 'Absent' : 'Incomplete');
-      return { key, office: emp.office, acNo: emp.acNo, name: emp.name, ...times, status };
-    })
-    // Offices in the same order as the sidebar (plain string order), names by localeCompare.
-    .sort((a, b) => (a.office < b.office ? -1 : a.office > b.office ? 1 : a.name.localeCompare(b.name)));
-}
-
 // "8:00-12:00, 1:00-5:00" from the shown month's punches; other months fill gaps.
 export function officialHours(punches, year, month) {
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;

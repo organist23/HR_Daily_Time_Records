@@ -151,13 +151,12 @@ Conventions later phases inherit:
 
 Paused 2026-11-09: Phase 6 built first by user decision. Not started, so no branch. Becomes NEXT when Phase 6 is DONE.
 
-Covers US-8, US-9, US-10.
+Covers US-8, US-10. US-9 withdrawn 2026-11-09 before merge (user decision: the sidebar filter and search are enough).
 
 - Office filter and live name/AC-No search
-- Date lookup of who worked
 - Live date and time display
 
-**Done when:** searching "lazaro" under HRMO opens his DTR, and the 7/03/2026 lookup shows the US-9 statuses.
+**Done when:** searching "lazaro" under HRMO opens his DTR, and the clock ticks every second.
 
 ### Phase 5 — Archive, delete, backup LATER
 

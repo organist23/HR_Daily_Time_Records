@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> Changed 2026-11-09: US-9 (date check, Task 1, Task 3) was withdrawn by the user before merge and removed. Phase 4 ships US-8 and US-10.
+
 **Goal:** The admin filters the employee list by office and by name or AC-No as they type, checks one date across employees with a status per person, and always sees the current date and time.
 
 **Architecture:**
