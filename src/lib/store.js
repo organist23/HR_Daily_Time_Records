@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOLIDAY_TYPES, offDayLabel } from './dtr.js';
+import { HOLIDAY_TYPES, offDayLabel, isDayKeyOf } from './dtr.js';
 
 const FILE = 'dtr-data.json';
 
@@ -40,7 +40,7 @@ export function setArchived(data, { office, acNo, archived }) {
   data[map] = { ...data[map], [key]: archived ? { ...rest, archived: true } : rest };
 }
 
-// Removes every own key of obj that starts with prefix (prefixes end in '|', so 'HR|' never matches 'HRMO|').
+// Removes every own key of obj that starts with prefix. Office names cannot contain '|', so 'HR|' never matches 'HRMO|'.
 const without = (obj, prefix) => Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => !k.startsWith(prefix)));
 
 export function deleteEmployee(data, { office, acNo }) {
@@ -48,8 +48,9 @@ export function deleteEmployee(data, { office, acNo }) {
   if (!Object.hasOwn(data.employees, key)) throw new Error('Unknown employee');
   const { [key]: _, ...employees } = data.employees;
   data.employees = employees;
-  data.punches = without(data.punches, `${key}|`);
-  data.adjustments = without(data.adjustments, `${key}|`);
+  const keep = (obj) => Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => !isDayKeyOf(k, office, acNo)));
+  data.punches = keep(data.punches);
+  data.adjustments = keep(data.adjustments);
 }
 
 // Removes the office, its employees, punches, adjustments, and settings. Holidays are global and stay.

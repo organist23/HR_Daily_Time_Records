@@ -8,6 +8,7 @@ export default function OfficeDialog({ office, settings, onSave, onCancel, onArc
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const first = useRef(null);
+  const dirty = inCharge !== (settings.inCharge ?? '') || grace !== String(settings.graceMinutes ?? 15);
 
   useDialogKeys(first, onCancel, busy);
 
@@ -37,8 +38,14 @@ export default function OfficeDialog({ office, settings, onSave, onCancel, onArc
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <div className="actions">
-          <button type="button" onClick={onArchive} disabled={busy}>Archive office</button>
-          <button type="button" className="danger" onClick={onDelete} disabled={busy}>Delete office</button>
+          {/* Disabled while there are unsaved edits, so leaving the dialog never drops them silently. */}
+          <button type="button" onClick={onArchive} disabled={busy || dirty} title={dirty ? 'Save or cancel your changes first' : undefined}>
+            Archive office
+          </button>
+          <button type="button" className="danger" onClick={onDelete} disabled={busy || dirty}
+            title={dirty ? 'Save or cancel your changes first' : undefined}>
+            Delete office
+          </button>
           <span className="spacer" />
           <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
           <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>

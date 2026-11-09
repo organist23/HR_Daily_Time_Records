@@ -363,6 +363,14 @@ describe('archive and delete', () => {
     expect(count(data.adjustments, 'HR|14|')).toBe(2); // AM set + PM cleared (device PM exists)
   });
 
+  it('an AC-No containing | does not take another employee\'s punches', () => {
+    const data = twoOffices();
+    mergeImport(data, 'HRMO', hrmo().filter((r) => r.acNo === '14').map((r) => ({ ...r, acNo: '14|2', name: 'Y' })));
+    deleteEmployee(data, { office: 'HRMO', acNo: '14' });
+    expect(count(data.punches, 'HRMO|14|2|')).toBe(14);
+    expect(data.employees['HRMO|14|2']).toBeDefined();
+  });
+
   it('deletes an office with its employees, punches, adjustments, and settings, keeping holidays', () => {
     const data = twoOffices();
     deleteOffice(data, 'HR');

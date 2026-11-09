@@ -55,6 +55,13 @@ export function effectivePunches(punches, adjustments, office, acNo) {
   return [...byKey.values()];
 }
 
+// Day keys of one employee: `${office}|${acNo}|YYYY-MM-DD|AM|PM`. Matching the whole tail, not just the prefix,
+// keeps AC-No '14' from matching AC-No '14|2'.
+export const isDayKeyOf = (key, office, acNo) => {
+  const prefix = `${office}|${acNo}|`;
+  return key.startsWith(prefix) && /^\d{4}-\d{2}-\d{2}\|(AM|PM)$/.test(key.slice(prefix.length));
+};
+
 // Label of a holiday (its type) or weekend for an ISO date, or '' for a workday.
 export function offDayLabel(date, holidays = {}) {
   const holiday = Object.hasOwn(holidays, date) ? holidays[date] : null;

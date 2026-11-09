@@ -6,7 +6,7 @@ import HolidaysView from './HolidaysView.jsx';
 import AdjustDialog from './AdjustDialog.jsx';
 import ArchivedView from './ArchivedView.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { MONTHS, computeDtr, daysIn, effectivePunches, officialHours, periodLabel } from './lib/dtr.js';
+import { MONTHS, computeDtr, daysIn, effectivePunches, isDayKeyOf, officialHours, periodLabel } from './lib/dtr.js';
 
 const NO_HOLIDAYS = {}; // stable empty map, so memoized pages are not rebuilt every render
 const HALVES = [['full', 'Full month'], ['first', '1–15'], ['second', '16–31']];
@@ -20,6 +20,9 @@ const punchesOf = (data, emp) => {
 };
 
 const NO_ADJUSTMENTS = {};
+
+// An employee is active unless they or their office is archived.
+const isActive = (data, emp) => Boolean(emp) && !emp.archived && !data.offices[emp.office]?.archived;
 
 // records: { archiveEmployee, deleteEmployee, archiveOffice, deleteOffice } from App, each taking the target.
 function Preview({ data, employee, onDataChange, onNotice, records }) {
@@ -193,8 +196,9 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
         </label>
         <button onClick={() => setEditing(true)}>Office settings</button>
         <div className="record-actions">
-          <button onClick={() => records.archiveEmployee(employee)}>Archive employee</button>
-          <button className="danger" onClick={() => records.deleteEmployee(employee)}>Delete employee</button>
+          {/* Disabled during a print or PDF job: closing the preview mid-job would lose its result. */}
+          <button disabled={working || !!batch} onClick={() => records.archiveEmployee(employee)}>Archive employee</button>
+          <button disabled={working || !!batch} className="danger" onClick={() => records.deleteEmployee(employee)}>Delete employee</button>
         </div>
         <div className="print-actions">
           <button disabled={working || !!batch} onClick={() => job('print')}>Print</button>
@@ -274,15 +278,12 @@ export default function App() {
     window.api.loadData().then(setData, (e) => setError(e.message));
   }, []);
 
-  // An employee is active unless they or their office is archived.
-  const isActive = (emp) => Boolean(emp) && !emp.archived && !data.offices[emp.office]?.archived;
-
   // Active offices and employees only. Archived ones are listed in the Archived view.
   const groups = useMemo(() => {
     if (!data) return [];
     const byOffice = {};
     for (const [key, emp] of Object.entries(data.employees)) {
-      if (!emp.archived && !data.offices[emp.office]?.archived) (byOffice[emp.office] ??= []).push({ key, ...emp });
+      if (isActive(data, emp)) (byOffice[emp.office] ??= []).push({ key, ...emp });
     }
     return Object.keys(byOffice).sort().map((office) => ({
       office,
@@ -294,12 +295,16 @@ export default function App() {
   // A leading '#' is ignored, since the list shows AC-No as '#14'.
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase().replace(/^#/, '');
-    const office = groups.some((g) => g.office === officeFilter) ? officeFilter : ''; // an archived filter falls back to all
     return groups
-      .filter((g) => !office || g.office === office)
+      .filter((g) => !officeFilter || g.office === officeFilter)
       .map((g) => ({ ...g, employees: g.employees.filter((e) => !q || e.name.toLowerCase().includes(q) || e.acNo.toLowerCase().includes(q)) }))
       .filter((g) => g.employees.length);
   }, [groups, officeFilter, search]);
+
+  // An office that is archived or deleted leaves the filter, so the filter goes back to all offices.
+  useEffect(() => {
+    if (officeFilter && !groups.some((g) => g.office === officeFilter)) setOfficeFilter('');
+  }, [groups, officeFilter]);
 
   const open = (key) => {
     setSelected(key);
@@ -307,9 +312,12 @@ export default function App() {
   };
 
   // The preview closes when the selected employee is archived or deleted.
-  const employee = data && selected && isActive(data.employees[selected]) ? data.employees[selected] : null;
+  const employee = data && selected && isActive(data, data.employees[selected]) ? data.employees[selected] : null;
 
-  const countKeys = (obj, prefix) => Object.keys(obj ?? {}).filter((k) => k.startsWith(prefix)).length;
+  // Counts for delete confirmations. Adjustments are stored per session, so they are counted as days.
+  const keysOf = (obj, match) => Object.keys(obj ?? {}).filter(match);
+  const days = (keys) => new Set(keys.map((k) => k.slice(0, k.lastIndexOf('|')))).size;
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   // Archive and restore are reversible, so they run at once and report in the status bar.
   const setArchived = async (target, archived, label) => {
@@ -341,15 +349,18 @@ export default function App() {
     archiveEmployee: (e) => setArchived({ office: e.office, acNo: e.acNo }, true, `${e.name} (#${e.acNo})`),
     archiveOffice: (office) => setArchived({ office }, true, `office ${office}`),
     deleteEmployee: (e) => {
-      const prefix = `${e.office}|${e.acNo}|`;
+      const mine = (k) => isDayKeyOf(k, e.office, e.acNo);
       askDelete('Delete employee',
-        `Delete ${e.name} (#${e.acNo}) from ${e.office}? This removes ${countKeys(data.punches, prefix)} punches and ${countKeys(data.adjustments, prefix)} adjustments. This cannot be undone.`,
+        `Delete ${e.name} (#${e.acNo}) from ${e.office}? This removes ${plural(keysOf(data.punches, mine).length, 'punch', 'punches')}`
+          + ` and ${plural(days(keysOf(data.adjustments, mine)), 'adjusted day', 'adjusted days')}. This cannot be undone.`,
         'Delete employee', () => window.api.deleteEmployee({ office: e.office, acNo: e.acNo }), `Deleted ${e.name} (#${e.acNo}).`);
     },
     deleteOffice: (office) => {
-      const prefix = `${office}|`;
+      const ours = (k) => k.startsWith(`${office}|`);
       askDelete('Delete office',
-        `Delete office ${office}? This removes ${countKeys(data.employees, prefix)} employees, ${countKeys(data.punches, prefix)} punches, ${countKeys(data.adjustments, prefix)} adjustments, and its settings. Holidays stay. This cannot be undone.`,
+        `Delete office ${office}? This removes ${plural(keysOf(data.employees, ours).length, 'employee', 'employees')}`
+          + `, ${plural(keysOf(data.punches, ours).length, 'punch', 'punches')}`
+          + `, ${plural(days(keysOf(data.adjustments, ours)), 'adjusted day', 'adjusted days')}, and its settings. Holidays stay. This cannot be undone.`,
         'Delete office', () => window.api.deleteOffice(office), `Deleted office ${office}.`);
     },
   };
@@ -381,6 +392,8 @@ export default function App() {
         ok: r.ok,
         text: r.ok
           ? `${r.file}: ${r.added} added, ${r.updated} updated, ${r.skipped} skipped (office ${r.office})`
+            // Records in an archived office stay hidden, so say where they went.
+            + (res.data.offices[r.office]?.archived ? `. Office ${r.office} is archived, see Archived.` : '')
           : `${r.file}: ${r.error}`,
       })));
     } catch (e) {
