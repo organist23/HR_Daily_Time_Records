@@ -174,11 +174,23 @@ Conventions later phases inherit:
 - The sidebar shows the `shown` groups (filtered). `groups` stays the full list for anything that needs every office.
 - Date and time in tests come from `app.context().clock.install(...)` plus `page.reload()`, never the real clock.
 
-### Phase 5 — Archive, delete, backup NEXT
+### Phase 5a — Archive and delete NEXT
 
-Covers US-11, US-12.
+Split from Phase 5 on 2026-11-09 (too big for one build, user decision).
 
-- Archive/restore and delete for employees, imports, and offices
-- Backup to one file and restore from it
+Covers US-11.
+
+- Archive and restore for employees and offices, with an Archived view
+- Delete for employees and offices, with confirmation naming what goes
+
+**Done when:** archiving duplicate SHARMAINE BANAO (#2025204) hides them from the HRMO list and office print, restoring brings them back, and deleting the HRMO1 office removes its 11 employees and their punches after confirmation.
+
+Deliberately not built, and why: backup and restore (Phase 5b), delete-import (dropped from US-11).
+
+### Phase 5b — Backup and restore LATER
+
+Covers US-12.
+
+- Backup to one file and restore from it, with an automatic copy of the current data first
 
 **Done when:** a backup restored after deleting all data brings back every office, employee, adjustment, and holiday.

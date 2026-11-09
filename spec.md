@@ -161,15 +161,20 @@ Withdrawn 2026-11-09: the sidebar office filter and search (US-8) are enough. Ne
 - [ ] The clock stops updating while the app is open.
 
 ### US-11: Archive and delete records
-**As** admin, **I want** to archive or delete employees, imports, and offices, **so that** old or duplicate data does not clutter the list (e.g. duplicate AC 2025204 "SHARMAINE BANAO").
+Changed 2026-11-09: delete-import dropped (punches are not tracked per import, and re-importing a corrected file already overwrites them). Archiving an office hides its employees too (admin decision).
+
+**As** admin, **I want** to archive or delete employees and offices, **so that** old or duplicate data does not clutter the list (e.g. duplicate AC 2025204 "SHARMAINE BANAO").
 
 **Accepts when:**
-- [ ] Archiving hides the record from default lists. An "Archived" view shows it and allows restoring.
-- [ ] Deleting asks for confirmation and removes the record and its punches and adjustments.
-- [ ] Deleting an import removes only the punches that came from that import.
+- [ ] Archiving an employee hides them from the sidebar and from office print/PDF. An "Archived" view shows them and allows restoring.
+- [ ] Archiving an office hides the office and all its employees from the sidebar, the office filter, and office print/PDF. Restoring the office brings them all back.
+- [ ] Re-importing into an archived office or for an archived employee keeps them archived.
+- [ ] Deleting an employee asks for confirmation naming the employee and how many punches and adjustments go with them, then removes all of it.
+- [ ] Deleting an office asks for confirmation naming the office and its employee count, then removes the office, its employees, punches, adjustments, and settings. Holidays stay.
 
 **Rejects when:**
-- [ ] Delete runs without confirmation.
+- [ ] Delete runs without confirmation, or Cancel changes anything.
+- [ ] Archived employees appear in the default list (also US-8).
 
 ### US-12: Backup and restore
 **As** admin, **I want** to back up all data to a file and restore it, **so that** records survive a PC failure or reinstall.
@@ -177,6 +182,7 @@ Withdrawn 2026-11-09: the sidebar office filter and search (US-8) are enough. Ne
 **Accepts when:**
 - [ ] Backup saves one file with all offices, employees, punches, adjustments, holidays, and settings to a location the admin picks.
 - [ ] Restore from that file replaces current data after confirmation, and the app shows the restored data.
+- [ ] Before replacing, the current data is saved as a dated copy in the data folder, and the confirmation names that copy. (Changed 2026-11-09: admin decision, so a wrong restore can be undone.)
 
 **Rejects when:**
 - [ ] Restoring an invalid or corrupt file changes any current data.
