@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import useDialogKeys from './useDialogKeys.js';
 
-export default function OfficeDialog({ office, settings, onSave, onCancel }) {
+// onArchive and onDelete close this dialog first; delete then asks for confirmation.
+export default function OfficeDialog({ office, settings, onSave, onCancel, onArchive, onDelete }) {
   const [inCharge, setInCharge] = useState(settings.inCharge ?? '');
   const [grace, setGrace] = useState(String(settings.graceMinutes ?? 15));
   const [error, setError] = useState('');
@@ -36,6 +37,9 @@ export default function OfficeDialog({ office, settings, onSave, onCancel }) {
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <div className="actions">
+          <button type="button" onClick={onArchive} disabled={busy}>Archive office</button>
+          <button type="button" className="danger" onClick={onDelete} disabled={busy}>Delete office</button>
+          <span className="spacer" />
           <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
           <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         </div>

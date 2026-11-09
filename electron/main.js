@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import {
   loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
+  setArchived, deleteEmployee, deleteOffice,
 } from '../src/lib/store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -89,6 +90,12 @@ ipcMain.handle('delete-holiday', (_event, date) => mutate((d) => deleteHoliday(d
 // The adjustment time comes from main's clock, not the renderer.
 ipcMain.handle('adjust-day', (_event, day) => mutate((d) => adjustDay(d, day ?? {}, new Date().toISOString())));
 ipcMain.handle('revert-day', (_event, day) => mutate((d) => revertDay(d, day ?? {})));
+// Archive or restore an employee (acNo given) or an office. Arguments are coerced: the renderer is not trusted.
+ipcMain.handle('set-archived', (_event, { office, acNo, archived } = {}) => mutate((d) => setArchived(d, {
+  office: String(office), acNo: acNo == null ? undefined : String(acNo), archived: archived === true,
+})));
+ipcMain.handle('delete-employee', (_event, { office, acNo } = {}) => mutate((d) => deleteEmployee(d, { office: String(office), acNo: String(acNo) })));
+ipcMain.handle('delete-office', (_event, office) => mutate((d) => deleteOffice(d, String(office))));
 
 const windowOf = (event) => BrowserWindow.fromWebContents(event.sender);
 
