@@ -116,7 +116,7 @@ Conventions later phases inherit:
 - Admin adjustments always win over later imports.
 - Anything that must not print gets a screen-only style plus a `@media print` reset, checked with `emulateMedia({ media: 'print' })` and then reset with `{ media: null }`.
 
-### Phase 6 — Non-working days always labeled NEXT
+### Phase 6 — Non-working days always labeled ✅ DONE (merged `a75a8e6`, 2026-11-09)
 
 Reopens Phase 2: US-6 changed (labels always win, 0 credit on holidays and weekends).
 Reopens Phase 3: US-7 changed (adjustments limited to workdays).
@@ -126,11 +126,28 @@ Supersedes Phase 2 convention: "their label shows only when the day has no times
 - Clicking a holiday or weekend day number shows a non-working-day message instead of the adjust dialog, and main rejects `adjust-day` on those dates
 - Existing adjustments on those days stay stored and show again if the holiday is deleted
 
-**Done when:** with a Special Non-Working Holiday on 7/01/2026, JOANNE M ESTRADA's July 1 row shows `SPECIAL NON-WORKING HOLIDAY` and her days total drops by that day's credit. RELITA 7/03 holiday shows the label. July 4/5 show `SATURDAY`/`SUNDAY` even with punches. Adjusting a weekend or holiday is refused. Test scope includes regression selection for US-2 totals and US-7 workday adjustments.
+**Done when:** with a Special Non-Working Holiday on 7/01/2026, JOANNE M ESTRADA's July 1 row shows `SPECIAL NON-WORKING HOLIDAY` and her days total drops by that day's credit. RELITA 7/03 holiday shows the label. July 4/5 show `SATURDAY`/`SUNDAY` even with punches. Adjusting a weekend or holiday is refused. Test scope includes regression selection for US-2 totals and US-7 workday adjustments. — **Verified** on 2026-11-09 with Playwright `_electron` and Vitest: 90/90 unit, 10/10 E2E (full run). Checked:
+- JOANNE 7/01 holiday: label, 6 → 5 days, then back after delete
+- RONIE 7/01: workday undertime (4h) returns after the holiday is deleted
+- RELITA 7/03 label replaces punches
+- UI and main both refuse adjusting July 1 (holiday) and July 4 (Saturday)
+- a hidden adjustment comes back after the holiday is deleted
+
+Results: `docs/test-results/PHASE-6-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/dtr.js`: `offDayLabel`, and `computeDtr` with the label always winning.
+- `src/lib/store.js`: `adjustDay` refuses non-working days.
+- React UI: `openAdjust` in `src/App.jsx` (non-working-day notice).
 
 Deliberately not built, and why: moving or deleting existing holiday/weekend adjustments (data stays, user decision), Phase 4 features.
 
-### Phase 4 — Find and check LATER
+Conventions later phases inherit:
+- Whether a day is a workday comes only from `offDayLabel(date, holidays)`. Use it in the UI, store, and computation, never a separate weekday check.
+- Holiday and weekend rows have no times, no credit, and no undertime. Deleting a holiday makes that day a workday again.
+- `docs/test-results/` is tracked. `.gitignore` ignores only the root `/test-results/`.
+
+### Phase 4 — Find and check NEXT
 
 Paused 2026-11-09: Phase 6 built first by user decision. Not started, so no branch. Becomes NEXT when Phase 6 is DONE.
 
