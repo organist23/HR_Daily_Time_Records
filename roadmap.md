@@ -297,7 +297,7 @@ Conventions later phases inherit:
 
 ## Part three — Night-shift device fixes
 
-### Phase 9 — Early departure filed as Clock In NEXT
+### Phase 9 — Early departure filed as Clock In ✅ DONE (merged `dd3ce9d`, 2026-11-10)
 
 Covers US-13 (changed 2026-11-10).
 Reopens Phase 8: a lone Clock In on a night shift's A.M. row is the departure.
@@ -306,6 +306,19 @@ Reopens Phase 8: a lone Clock In on a night shift's A.M. row is the departure.
 - The punch shows in the A.M. Departure cell
 - Day-employee DTRs and the `NIGHT_shift.xls` values stay the same
 
-**Done when:** importing `sample_data/GSO_.xls` shows RENATO 10/06 A.M. Departure `5:57`, his 10/05 shift credits 777 min, and EFREN's `NIGHT_shift.xls` September 1–15 is still `9 days`.
+**Done when:** importing `sample_data/GSO_.xls` shows RENATO 10/06 A.M. Departure `5:57`, his 10/05 shift credits 777 min, and EFREN's `NIGHT_shift.xls` September 1–15 is still `9 days`. — **Verified** on 2026-11-10 with Playwright `_electron` and Vitest: 141/141 unit, 20/20 E2E (full run). Checked:
+- `GSO_.xls` imports 2,851 rows
+- RENATO 10/06 shows `5:57` as the A.M. departure on the form and in the Adjust dialog
+- 10/05 → 10/06 credits 777 with 3 min early
+- REYGAN 10/09 → 10/10 credits 772
+- day employees and `NIGHT_shift.xls` unchanged
+
+Results: `docs/test-results/PHASE-9-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/parse.js`: `parseRows` (a lone Clock In on a night A.M. row is stored as the Clock Out).
 
 Deliberately not built, and why: the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
+
+Conventions later phases inherit:
+- Device quirks are corrected once in `parseRows`, so every reader (`computeDtr`, the Adjust dialog, `adjustDay`) sees the same punch. Never correct a punch only for display.
