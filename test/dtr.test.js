@@ -223,3 +223,87 @@ describe('adjustments', () => {
     expect([d.credited, d.days, d.totalUndertime]).toEqual([1200, 2, 960]);
   });
 });
+
+// US-13 night shift. Hand-derived from sample_data/NIGHT_shift.xls (EFREN ALCANTARA #479), grace 0:
+// a shift is the P.M. row (17:00-23:59, Clock In) plus the next day's A.M. row (01:00-06:00, Clock Out),
+// credited straight through midnight: start row up to 24:00, end row from 00:00 to 06:00.
+describe('night shift (US-13)', () => {
+  const efren = parseRows(readSheetRows(fs.readFileSync('sample_data/NIGHT_shift.xls'))).records;
+  const sept = (punches, half = 'first', holidays = {}) =>
+    computeDtr({ punches, year: 2026, month: 9, half, graceMinutes: 0, holidays });
+  const onDates = (...dates) => efren.filter((p) => dates.includes(p.date));
+  const night = (date, session, onDuty, offDuty, inT, outT) =>
+    ({ acNo: '479', name: 'EFREN ALCANTARA', date, session, onDuty, offDuty, in: inT, out: outT });
+
+  it('September 1-15: 4,613 credited min = 9 days, 1,147 min undertime', () => {
+    const d = sept(efren);
+    expect([d.credited, d.days, d.totalUndertime]).toEqual([4613, 9, 1147]);
+  });
+
+  it('9/02 17:12 to 9/03 06:01 credits 408 + 360 and is 12 min late', () => {
+    const d = sept(onDates('2026-09-02', '2026-09-03'));
+    expect(d.credited).toBe(768);
+    expect(d.rows[1]).toMatchObject({ pmIn: '5:12', pmOut: '', undertime: 12, night: true });
+    expect(d.rows[2]).toMatchObject({ amIn: '', amOut: '6:01', undertime: 0, night: true });
+  });
+
+  it('16:44 on Friday to 06:00 Saturday credits 780, and Saturday shows its time', () => {
+    const d = sept(onDates('2026-09-04', '2026-09-05'));
+    expect(d.credited).toBe(780);
+    expect(d.rows[4]).toMatchObject({ label: '', amOut: '6:00', undertime: 0, night: true });
+  });
+
+  it('a missing departure gives the whole 13h shift as undertime on the start row', () => {
+    const d = sept(onDates('2026-09-14', '2026-09-15'));
+    expect(d.credited).toBe(0);
+    expect(d.rows[13]).toMatchObject({ pmIn: '5:11', undertime: 780 });
+    expect(d.rows[14].undertime).toBe(0);
+  });
+
+  it('9/01 departure with no 8/31 data: day rule, 0 credit and 5h undertime', () => {
+    const d = sept(onDates('2026-09-01'));
+    expect(d.credited).toBe(0);
+    expect(d.rows[0]).toMatchObject({ amOut: '6:00', undertime: 300 });
+  });
+
+  it('9/01 pairs with an 8/31 arrival when August is imported', () => {
+    const d = sept([night('2026-08-31', 'PM', '17:00', '23:59', '17:00', ''), ...onDates('2026-09-01')]);
+    expect(d.credited).toBe(360);
+    expect(d.rows[0]).toMatchObject({ amOut: '6:00', undertime: 0, night: true });
+  });
+
+  it('a holiday keeps the night times and their credit', () => {
+    const holidays = { '2026-09-08': { date: '2026-09-08', name: 'Test', type: 'Regular Holiday' } };
+    const d = sept(efren, 'first', holidays);
+    expect(d.rows[7]).toMatchObject({ label: '', pmIn: '4:52' });
+    expect(d.credited).toBe(4613);
+  });
+
+  it('a weekend night row with no times still shows the label', () => {
+    const d = sept([night('2026-09-19', 'PM', '17:00', '23:59', '', ''), night('2026-09-20', 'AM', '01:00', '06:00', '', '')], 'second');
+    expect(d.rows[18]).toMatchObject({ label: 'SATURDAY', pmIn: '' });
+    expect(d.rows[19]).toMatchObject({ label: 'SUNDAY' });
+  });
+
+  it('a shift over the period edge credits each half its own row', () => {
+    const p = [night('2026-09-15', 'PM', '17:00', '23:59', '17:00', ''), night('2026-09-16', 'AM', '01:00', '06:00', '', '06:00')];
+    expect(sept(p, 'first').credited).toBe(420);
+    expect(sept(p, 'second').credited).toBe(360);
+  });
+
+  it('a weekend start with no arrival keeps the 13h undertime (review)', () => {
+    const d = sept([night('2026-09-19', 'PM', '17:00', '23:59', '', ''), night('2026-09-20', 'AM', '01:00', '06:00', '', '06:00')], 'second');
+    expect(d.rows[18]).toMatchObject({ label: '', pmIn: '', undertime: 780 });
+    expect(d.rows[19]).toMatchObject({ label: '', amOut: '6:00', undertime: 0 });
+  });
+
+  it('a day after a night start with no A.M. row is still a night row (review)', () => {
+    const d = sept([night('2026-09-18', 'PM', '17:00', '23:59', '17:00', '')], 'second');
+    expect(d.rows[18]).toMatchObject({ label: 'SATURDAY', night: true });
+    expect(d.rows[17].undertime).toBe(420); // no end row: only the 17:00-24:00 part is known
+  });
+
+  it('official hours come from the data', () => {
+    expect(officialHours(efren, 2026, 9)).toBe('1:00-6:00, 5:00-11:59');
+  });
+});

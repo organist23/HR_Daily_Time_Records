@@ -7,6 +7,36 @@ const hrmoRows = () => readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls')
 const find = (records, acNo, date, session) =>
   records.find((r) => r.acNo === acNo && r.date === date && r.session === session);
 
+describe('parseRows night shift (US-13)', () => {
+  const night = () => parseRows(readSheetRows(fs.readFileSync('sample_data/NIGHT_shift.xls')));
+
+  it('places rows by On duty, so all 30 night rows import', () => {
+    const { records, skipped } = night();
+    expect(records).toHaveLength(30);
+    expect(skipped).toBe(0);
+    // night guard 1 (17:00-23:59) goes to P.M., night guard 2 (01:00-06:00) to A.M.
+    expect(find(records, '479', '2026-09-02', 'PM')).toMatchObject({ onDuty: '17:00', offDuty: '23:59', in: '17:12', out: '' });
+    expect(find(records, '479', '2026-09-03', 'AM')).toMatchObject({ onDuty: '01:00', offDuty: '06:00', in: '', out: '06:01' });
+  });
+
+  it('skips a second row for the same day and session instead of overwriting the first', () => {
+    // A third timetable (e.g. overtime 18:00-22:00) would land in P.M. too. The Afternoon row is kept.
+    const rows = hrmoRows();
+    rows.push(['14', 'RELITA BARAYA', '7/01/2026', 'Overtime', '18:00', '22:00', '18:05', '21:58', '', '', '']);
+    const { records, skipped } = parseRows(rows);
+    expect(records).toHaveLength(154);
+    expect(skipped).toBe(1);
+    expect(find(records, '14', '2026-07-01', 'PM')).toMatchObject({ onDuty: '13:00' });
+  });
+
+  it('HRMO Morning and Afternoon rows keep their sessions', () => {
+    const { records } = parseRows(hrmoRows());
+    expect(records.filter((r) => r.session === 'AM').every((r) => r.onDuty === '08:00')).toBe(true);
+    expect(records.filter((r) => r.session === 'PM').every((r) => r.onDuty === '13:00')).toBe(true);
+    expect(records.filter((r) => r.session === 'AM')).toHaveLength(77);
+  });
+});
+
 describe('parseRows', () => {
   it('parses HRMO (3).xls', () => {
     const { records, skipped } = parseRows(hrmoRows());

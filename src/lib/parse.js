@@ -1,7 +1,6 @@
 import * as XLSX from 'xlsx';
 
 const REQUIRED = ['AC-No.', 'Name', 'Date', 'Timetable', 'On duty', 'Off duty', 'Clock In', 'Clock Out'];
-const SESSIONS = { morning: 'AM', afternoon: 'PM' };
 // 24h "8:05" / "08:05:00", or 12h "8:05 AM" as Excel formats real time cells.
 const TIME = /^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?\s*([AaPp][Mm])?$/;
 
@@ -43,22 +42,29 @@ export function parseRows(rows) {
   if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
 
   const records = [];
+  const seen = new Set(); // acNo|date|session: a third timetable must not overwrite the first P.M. row
   let skipped = 0;
   for (const row of rows.slice(1)) {
     if (row.every((c) => String(c).trim() === '')) continue;
     const get = (name) => row[col[name]] ?? '';
+    const onDuty = parseTime(get('On duty'), false);
     const rec = {
       acNo: String(get('AC-No.')).trim(),
       name: String(get('Name')).trim(),
       date: parseDate(get('Date')),
-      session: SESSIONS[String(get('Timetable')).trim().toLowerCase()],
-      onDuty: parseTime(get('On duty'), false),
+      // By On duty, not the Timetable name: Morning/night guard 2 start before noon, Afternoon/night guard 1 after.
+      session: onDuty && (onDuty < '12:00' ? 'AM' : 'PM'),
+      onDuty,
       offDuty: parseTime(get('Off duty'), false),
       in: parseTime(get('Clock In'), true),
       out: parseTime(get('Clock Out'), true),
     };
-    if (!rec.acNo || Object.values(rec).some((v) => v === null || v === undefined)) skipped++;
-    else records.push(rec);
+    const key = `${rec.acNo}|${rec.date}|${rec.session}`;
+    if (!rec.acNo || Object.values(rec).some((v) => v === null || v === undefined) || seen.has(key)) skipped++;
+    else {
+      seen.add(key);
+      records.push(rec);
+    }
   }
   return { records, skipped };
 }

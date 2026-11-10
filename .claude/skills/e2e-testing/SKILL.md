@@ -34,6 +34,8 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 
 - **Captured, not invented.** `sample_data/HRMO (3).xls` is a real device export (BIFF2, 11 employees,
   154 rows, July 1–9 2026). It is committed on purpose. Use it for every happy path.
+  `sample_data/NIGHT_shift.xls` is a real night-shift export (BIFF2, 1 guard, 30 rows, September 1–15 2026,
+  timetables `night guard 1` 17:00–23:59 and `night guard 2` 01:00–06:00). Use it for night-shift paths.
 - **Bad inputs are derived from the captured file**, not typed from scratch. Example: the
   missing-column file is HRMO rows with `Clock Out` removed, written as `.xlsx` with SheetJS.
 - SheetJS ESM has no file access. Use `XLSX.read(fs.readFileSync(p))` and
@@ -53,6 +55,7 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 | RONIE LOUISE BERMUDEZ (568) | 1–15 | day 1: A.M. arrival `8:00`, departure blank, undertime 4h. Day 2: 3m | 7/01 AM has arrival only, PM absent. 7/02 in 8:01 and 1:02 |
 | JOHN RYAN A. LAZARO (611) | 1–15 | day 8: undertime 18m. Day 6: 14m (0 at grace 15) | 8:18. 8:08 and 1:06 = 8 + 6 |
 | RELITA BARAYA (14) | 1–15 | `6 days`, undertime 4h | 13 full sessions × 240 = 3120 min, floor(3120/480) = 6. 7/03 PM has departure only |
+| EFREN ALCANTARA (479), `NIGHT_shift.xls` | Sept 1–15 | `9 days`, undertime 19h 7m. 9/02 P.M. arrival `5:12`, 9/03 A.M. departure `6:01`, 9/14 undertime 13h | 6 full shifts credited through midnight = 4,613 min. 9/14 has no departure (780). 9/01 has no 8/31 start (300). Lates 12 + 19 + 30 + 6 |
 
 ## During the pass
 

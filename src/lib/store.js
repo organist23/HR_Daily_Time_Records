@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOLIDAY_TYPES, offDayLabel, isDayKeyOf } from './dtr.js';
+import { HOLIDAY_TYPES, offDayLabel, isDayKeyOf, isNightStart, shiftDate } from './dtr.js';
 
 const FILE = 'dtr-data.json';
 
@@ -145,8 +145,15 @@ function sessionHours(data, office, acNo, session, date) {
 export function adjustDay(data, { office, acNo, date, am, pm, reason }, at) {
   if (!Object.hasOwn(data.employees, `${office}|${acNo}`)) throw new Error('Unknown employee');
   if (!isIsoDate(date)) throw new Error('Invalid date');
-  // Holidays and weekends always show their label, so their times cannot be adjusted.
-  if (offDayLabel(date, data.holidays)) throw new Error(`${date} is a non-working day`);
+  // Holidays and weekends always show their label, so their times cannot be adjusted,
+  // except a guard's night-shift rows (a night shift starts that day or the day before, US-13).
+  // The P.M. row as shown: an adjustment (which keeps its own hours) wins over the device row.
+  const pmOf = (d) => {
+    const key = `${office}|${acNo}|${d}|PM`;
+    return data.adjustments?.[key] ? { session: 'PM', ...data.adjustments[key] } : data.punches[key];
+  };
+  const night = isNightStart(pmOf(date)) || isNightStart(pmOf(shiftDate(date, -1)));
+  if (!night && offDayLabel(date, data.holidays)) throw new Error(`${date} is a non-working day`);
   const sessions = { AM: am ?? {}, PM: pm ?? {} };
   for (const [s, v] of Object.entries(sessions)) {
     for (const t of [v.in ?? '', v.out ?? '']) {
