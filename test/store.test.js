@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
-import { emptyData, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay, setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup } from '../src/lib/store.js';
+import { emptyData, migrateGrace, resolveOffice, mergeImport, loadData, saveData, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay, setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup } from '../src/lib/store.js';
 import { HOLIDAY_TYPES } from '../src/lib/dtr.js';
 
 const hrmo = () => parseRows(readSheetRows(fs.readFileSync('sample_data/HRMO (3).xls'))).records;
@@ -22,7 +22,7 @@ describe('mergeImport', () => {
     expect(mergeImport(data, 'HRMO', hrmo())).toEqual({ added: 0, updated: 154 });
     expect(Object.keys(data.punches)).toHaveLength(154);
     expect(Object.keys(data.employees)).toHaveLength(11);
-    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 15 });
+    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 0 });
     expect(data.punches['HRMO|14|2026-07-01|AM']).toMatchObject({ office: 'HRMO', in: '07:58' });
   });
 
@@ -37,9 +37,42 @@ describe('mergeImport', () => {
   it('keeps an office grace setting on re-import', () => {
     const data = emptyData();
     mergeImport(data, 'HRMO', hrmo());
-    data.offices.HRMO.graceMinutes = 0;
+    data.offices.HRMO.graceMinutes = 10;
     mergeImport(data, 'HRMO', hrmo());
-    expect(data.offices.HRMO.graceMinutes).toBe(0);
+    expect(data.offices.HRMO.graceMinutes).toBe(10);
+  });
+});
+
+describe('migrateGrace (grace default 0, US-5 changed 2026-11-10)', () => {
+  const v1 = () => ({
+    ...emptyData(),
+    version: 1,
+    offices: {
+      HRMO: { name: 'HRMO', graceMinutes: 15, inCharge: 'MARIVIC P. SARINAS' },
+      ACCT: { name: 'ACCT', graceMinutes: 10, archived: true },
+    },
+  });
+
+  it('sets every office of version 1 data to grace 0 and marks it version 2', () => {
+    const data = v1();
+    expect(migrateGrace(data)).toBe(true);
+    expect(data.version).toBe(2);
+    expect(data.offices).toEqual({
+      HRMO: { name: 'HRMO', graceMinutes: 0, inCharge: 'MARIVIC P. SARINAS' },
+      ACCT: { name: 'ACCT', graceMinutes: 0, archived: true },
+    });
+  });
+
+  it('leaves version 2 data alone, so a grace the admin set later stays', () => {
+    const data = { ...v1(), version: 2 };
+    expect(migrateGrace(data)).toBe(false);
+    expect(data.offices.HRMO.graceMinutes).toBe(15);
+    expect(data.offices.ACCT.graceMinutes).toBe(10);
+  });
+
+  it('new data starts at version 2', () => {
+    expect(emptyData().version).toBe(2);
+    expect(migrateGrace(emptyData())).toBe(false);
   });
 });
 
@@ -64,8 +97,8 @@ describe('office names that clash with object internals', () => {
     mergeImport(data, '__proto__', records);
     mergeImport(data, 'constructor', records);
     expect(Object.keys(data.offices).sort()).toEqual(['__proto__', 'constructor']);
-    expect(data.offices.constructor).toEqual({ name: 'constructor', graceMinutes: 15 });
-    expect(JSON.parse(JSON.stringify(data)).offices.__proto__).toEqual({ name: '__proto__', graceMinutes: 15 });
+    expect(data.offices.constructor).toEqual({ name: 'constructor', graceMinutes: 0 });
+    expect(JSON.parse(JSON.stringify(data)).offices.__proto__).toEqual({ name: '__proto__', graceMinutes: 0 });
   });
 });
 
@@ -108,7 +141,7 @@ describe('updateOffice', () => {
   it.each([-1, 61, 'abc', 1.5, '', '0x10', '1e1', true, ' 5 x'])('rejects grace %s and leaves data unchanged', (grace) => {
     const data = withHrmo();
     expect(() => updateOffice(data, 'HRMO', { inCharge: 'X', graceMinutes: grace })).toThrow(/whole number from 0 to 60/);
-    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 15 });
+    expect(data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 0 });
   });
 
   it('updates an office named __proto__ as a plain key', () => {
@@ -412,12 +445,21 @@ describe('backup and restore', () => {
     expect(Object.keys(back.data.adjustments)).toHaveLength(2);
     expect(back.data.employees['HRMO|2025204'].archived).toBe(true);
     expect(back.data.offices.HRMO).toMatchObject({ inCharge: 'JUAN DELA CRUZ', graceMinutes: 10 });
+    expect(JSON.parse(makeBackup(data, SAVED)).data.version).toBe(2);
+  });
+
+  it('restores a backup made before grace default 0 with every office at grace 0', () => {
+    const text = broken((f, d) => { d.version = 1; d.offices.HRMO.graceMinutes = 15; });
+    const back = readBackup(text);
+    expect(back.data.version).toBe(2);
+    expect(back.data.offices.HRMO).toEqual({ name: 'HRMO', graceMinutes: 0, inCharge: 'JUAN DELA CRUZ' });
   });
 
   it.each([
     ['not JSON', () => '{"format":', /Invalid backup: not a JSON file/],
     ['another JSON file', () => JSON.stringify({ hello: 1 }), /Invalid backup: not a DTR Analyzer backup/],
     ['wrong version', () => broken((f) => { f.version = 2; }), /Invalid backup: unsupported version/],
+    ['an unknown data version', () => broken((f, d) => { d.version = 3; }), /Invalid backup: unsupported version/],
     ['a map is not an object', () => broken((f, d) => { d.punches = []; }), /Invalid backup: punches/],
     ['office grace out of range', () => broken((f, d) => { d.offices.HRMO.graceMinutes = 99; }), /Invalid backup: office \(HRMO\)/],
     ['office name with |', () => broken((f, d) => { d.offices['A|B'] = { name: 'A|B', graceMinutes: 15 }; }), /Invalid backup: office \(A\|B\)/],

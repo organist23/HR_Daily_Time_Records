@@ -26,6 +26,10 @@ describe('computeDtr', () => {
     expect(july('568', 'first', 0).rows[1].undertime).toBe(3); // RONIE 7/02 in 08:01 and 13:02
   });
 
+  it('grace 0 (default since 2026-11-10): LAZARO 7/06 is 14 min late', () => {
+    expect(july('611', 'first', 0).rows[5].undertime).toBe(14); // 08:08 = 8 + 13:06 = 6
+  });
+
   it('RELITA July 1-15 totals', () => {
     // 7 days x 2 sessions = 14; 13 complete on time (240 each), 7/03 PM missing arrival.
     const d = july('14');
