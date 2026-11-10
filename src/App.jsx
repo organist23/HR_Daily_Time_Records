@@ -56,10 +56,10 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
   const closeAdjust = useCallback(() => setAdjusting(null), []);
   const isoDay = (day) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   const dayName = (day) => (day <= daysIn(year, month) ? `${MONTHS[month - 1]} ${day}, ${year}` : '');
-  // Holidays and weekends always show their label, so they open no adjust dialog.
+  // Holidays and weekends always show their label, so they open no adjust dialog. A guard's night-shift row does (US-13).
   const openAdjust = (day) => {
-    const { label } = result.rows[day - 1];
-    if (label) onNotice([{ ok: false, text: `${dayName(day)} is a non-working day (${label}). Its times cannot be adjusted.` }]);
+    const { label, night } = result.rows[day - 1];
+    if (label && !night) onNotice([{ ok: false, text: `${dayName(day)} is a non-working day (${label}). Its times cannot be adjusted.` }]);
     else setAdjusting(day);
   };
 

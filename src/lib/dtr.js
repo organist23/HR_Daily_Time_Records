@@ -38,7 +38,7 @@ function session(p, graceMinutes) {
 }
 
 // ISO date plus n days.
-const shiftDate = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+export const shiftDate = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 
 // US-13: a P.M. row ending at 23:59 starts a night shift that ends on the next day's A.M. row.
 export const isNightStart = (p) => p?.session === 'PM' && p.offDuty === '23:59';

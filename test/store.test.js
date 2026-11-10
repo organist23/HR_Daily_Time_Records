@@ -321,6 +321,19 @@ describe('time adjustments', () => {
     expect(data.adjustments ?? {}).toEqual({});
   });
 
+  // US-7 Changed 2026-11-10: a guard's night-shift rows can be adjusted on weekends and holidays.
+  it('allows a weekend or holiday night-shift row', () => {
+    const data = emptyData();
+    mergeImport(data, 'GUARD', parseRows(readSheetRows(fs.readFileSync('sample_data/NIGHT_shift.xls'))).records);
+    const g = { office: 'GUARD', acNo: '479', reason: 'Forgot to punch' };
+    // Sat 9/05: A.M. end of the 9/04 shift. Sun 9/06: P.M. start of a shift.
+    adjustDay(data, { ...g, date: '2026-09-05', am: { in: '', out: '06:30' }, pm: { in: '', out: '' } }, AT);
+    adjustDay(data, { ...g, date: '2026-09-06', am: { in: '', out: '' }, pm: { in: '17:00', out: '' } }, AT);
+    setHoliday(data, { date: '2026-09-08', name: 'X', type: 'Regular Holiday' });
+    adjustDay(data, { ...g, date: '2026-09-08', am: { in: '', out: '' }, pm: { in: '17:00', out: '' } }, AT);
+    expect(Object.keys(data.adjustments).sort()).toEqual(['GUARD|479|2026-09-05|AM', 'GUARD|479|2026-09-06|PM', 'GUARD|479|2026-09-08|PM']);
+  });
+
   it('refuses a holiday, and still reverts an adjustment made before the holiday', () => {
     const data = ronie();
     adjustDay(data, wfh, AT);
