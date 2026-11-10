@@ -325,7 +325,7 @@ Conventions later phases inherit:
 
 ## Part four — DTR display
 
-### Phase 10 — Show or hide undertime and total NEXT
+### Phase 10 — Show or hide undertime and total ✅ DONE (merged `329dcef`, 2026-11-10)
 
 Covers US-14.
 Reopens Phase 0: US-3 preview shows undertime and total blank by default. Reopens Phase 1: US-4 print and PDF follow the toggle.
@@ -333,6 +333,22 @@ Reopens Phase 0: US-3 preview shows undertime and total blank by default. Reopen
 - One toolbar button toggles the undertime cells, the days total, and the undertime total
 - Hidden at every start, for screen, print, PDF, and office batches
 
-**Done when:** a freshly opened DTR shows blank undertime and Total values, an exported PDF has them blank, Show brings back RONIE July 1–15 `2 days` and 20h, and arrival and departure times show in both states.
+**Done when:** a freshly opened DTR shows blank undertime and Total values, an exported PDF has them blank, Show brings back RONIE July 1–15 `2 days` and 20h, and arrival and departure times show in both states. — **Verified** on 2026-11-10 with Playwright `_electron` and Vitest: 141/141 unit, 21/21 E2E (full run). Checked:
+- hidden by default on screen and under print media
+- Print office prints 11 pages with no days total while hidden and 11 with it while shown
+- the toggle is locked during a job
+- the shown state carries across employees and resets on relaunch
+- RONIE `2 days` and 20h come back
+- arrival and departure times show in both states
+
+Results: `docs/test-results/PHASE-10-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/DtrForm.jsx`: `showTotals` prop (default `false`).
+- React UI: `showTotals` state in `App`, and the `Show/Hide undertime and total` button in `Preview` in `src/App.jsx`.
 
 Deliberately not built, and why: saving the toggle to the data file (admin chose hidden at every start), and the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
+
+Conventions later phases inherit:
+- Every `DtrForm` render passes `showTotals`. Session-wide display settings live in `App` state, since `Preview` remounts per employee.
+- E2E specs that read undertime or totals call `showTotals(page)` from `test/e2e/helpers.js` after the first employee opens in each launch.
