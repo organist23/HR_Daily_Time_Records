@@ -6,11 +6,11 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 ## Assumptions
 - Single admin user on one Windows PC. No login, no server, no database server.
 - Stack: Electron, React (Vite), SheetJS for Excel parsing. Data stored as JSON files in the app's user data folder.
-- All offices' devices export the same columns as `sample_data/HRMO (3).xls`: `AC-No., Name, Date, Timetable, On duty, Off duty, Clock In, Clock Out, Late, Early, Absent`. Every cell is text. Dates are `M/DD/YYYY` and times are 24h `HH:MM`. There are two rows per employee per day (`Morning`, `Afternoon`).
+- All offices' devices export the same columns as `sample_data/HRMO (3).xls`: `AC-No., Name, Date, Timetable, On duty, Off duty, Clock In, Clock Out, Late, Early, Absent`. Every cell is text. Dates are `M/DD/YYYY` and times are 24h `HH:MM`. There are two rows per employee per day. Each row goes to the A.M. cells when its `On duty` is before 12:00 and to the P.M. cells otherwise. Timetable names are not used. Changed 2026-11-10: rows used to be matched by the names `Morning`/`Afternoon`, which skipped every row of `sample_data/NIGHT_shift.xls`.
 - `HRMO (3).xls` is in Excel 2.1 (BIFF2) format. `.xls` (any BIFF version) and `.xlsx` must both import.
 - Employee identity = office + AC-No.
 - The device's `Late`, `Early`, and `Absent` columns are ignored. The app computes them (the device reports a missing punch as `01:00`, which is wrong).
-- Only regular employees with Morning/Afternoon sessions are supported. Shift workers are out of scope.
+- Day employees (Morning/Afternoon) and night-shift guards (`sample_data/NIGHT_shift.xls`) are supported. Changed 2026-11-10: night shift added (US-13).
 - Print layout: one DTR copy per A4 portrait page, matching `sample_data/Appendix-24-Daily-Time-Record-DTR (1).docx` (header "Civil Service Form No. 48", "DAILY TIME RECORD", name, period, official hours, Day / A.M. / P.M. / Undertime table, Total row, certification, signature over printed name, VERIFIED line, In Charge).
 
 ### Computation rules (confirmed)
@@ -26,11 +26,22 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Day undertime** = sum of both sessions, shown in the Hours and Minutes columns.
 - **Credited minutes** for a session with both punches = session length − late − early (minimum 0). This means time outside official hours is never credited.
 - **Days total** = floor(total credited minutes ÷ 480). It is printed in the Total row as `<n> days`. This matches the reference photo: 100h03m ÷ 8 = 12.5 → "12 days". The undertime total goes in the Total row's Undertime columns.
-- **Holidays and weekends** are non-working days. The label always goes across the time cells, with 0 credit and no undertime, even when device punches or adjustments exist on that day. Added 2026-11-08 from the Phase 2 review. Changed 2026-11-09: the label used to give way to time entries. The admin decided non-working days always show the label and add nothing to the days total.
+- **Holidays and weekends** are non-working days. The label always goes across the time cells, with 0 credit and no undertime, even when device punches or adjustments exist on that day. Added 2026-11-08 from the Phase 2 review. Changed 2026-11-09: the label used to give way to time entries. The admin decided non-working days always show the label and add nothing to the days total. Changed 2026-11-10: night-shift rows are the exception (see Night shift below).
+
+### Night shift (added 2026-11-10, US-13)
+- **A night shift** starts on a P.M. row whose `Off duty` is `23:59` and ends on the next day's A.M. row. In `NIGHT_shift.xls` the device splits it into 17:00–23:59 (Clock In only) and 01:00–06:00 next day (Clock Out only). There is never a midnight punch.
+- **Display** follows the handwritten reference photo: the arrival shows in the start day's P.M. Arrival cell, and the departure in the next day's A.M. Departure cell. Times show as punched.
+- **Shift hours** run from the P.M. row's `On duty` to the next A.M. row's `Off duty`, straight through midnight (17:00 → 06:00 = 13h).
+- **Credited minutes** = time from arrival to departure inside the shift hours, split at midnight: start-day row up to 24:00, next-day row from 00:00. Example: 17:12 → 06:01 credits 408 + 360 = 768 min.
+- **Late** = arrival − P.M. `On duty`, with the office grace. **Early** = A.M. `Off duty` − departure.
+- **Missing arrival or departure**: the shift credits 0 and its undertime is the whole shift (13h), on the start-day row. The admin fixes it with an adjustment.
+- **Weekends and holidays**: a row with night-shift times shows the times and counts like any day. A row with no night-shift times still shows the label.
+- **Days total** uses the same rule as day employees: floor(credited ÷ 480).
 
 ## User Stories
 
 ### US-1: Import Excel files per office
+Changed 2026-11-10: rows are placed by `On duty` time, so night-shift files import (US-13).
 **As** admin, **I want** to select one or more Excel files and assign each to an office, **so that** punches are stored locally under the right office.
 
 **Accepts when:**
@@ -46,6 +57,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - [ ] A row has an invalid date or time: the row is skipped and the import summary shows the skipped count.
 
 ### US-2: Compute the DTR
+Changed 2026-11-10: night-shift computation added (US-13). Day-employee rules unchanged.
 **As** admin, **I want** each employee's DTR computed automatically for a chosen month or half-month, **so that** I don't fill it by hand.
 
 **Accepts when:**
@@ -97,6 +109,7 @@ Changed 2026-11-10: grace minutes default to 0, and existing offices were set to
 - [ ] A one-print override changes the saved office default.
 
 ### US-6: Holidays and weekends
+Changed 2026-11-10: night-shift rows with times show the times and count on weekends and holidays (admin decision, guards work those days). Day employees unchanged.
 Changed 2026-11-09: labels always win over time entries, and non-working days add no credit (admin decision, reverses the 2026-11-08 rule).
 
 **As** admin, **I want** to add, edit, and delete holidays with a type, and have weekends labeled, **so that** those rows are filled correctly.
@@ -114,6 +127,7 @@ Changed 2026-11-09: labels always win over time entries, and non-working days ad
 - [ ] A holiday or weekend row shows times or adds credit to the days total.
 
 ### US-7: Adjust times
+Changed 2026-11-10: night-shift rows can be adjusted on weekends and holidays, so a missing guard punch can be fixed.
 Changed 2026-11-09: adjustments are limited to workdays, since holiday and weekend rows always show their label (see US-6).
 
 **As** admin, **I want** to add, edit, or clear any AM/PM arrival or departure for an employee's day with a reason (e.g. work from home), **so that** the DTR shows approved adjustments.
@@ -191,8 +205,26 @@ Changed 2026-11-09: Delete is offered only in the Archived view, so a record mus
 **Rejects when:**
 - [ ] Restoring an invalid or corrupt file changes any current data.
 
+### US-13: Night shift
+**As** admin, **I want** night-shift guards' files imported and computed, **so that** guards get a correct DTR like day employees.
+
+**Accepts when:**
+- [ ] Importing `sample_data/NIGHT_shift.xls` stores all 30 rows for EFREN ALCANTARA (AC 479), with 0 skipped.
+- [ ] 9/02/2026 shows P.M. Arrival `5:12` and 9/03/2026 shows A.M. Departure `6:01`. The shift credits 768 min (408 + 360), 12 min late at grace 0.
+- [ ] 9/04/2026 (16:44 → 9/05 06:00) credits 780 min. Saturday 9/05 shows A.M. Departure `6:00`, not `SATURDAY`.
+- [ ] 9/14/2026 arrival `5:11` with no 9/15 departure: the shift credits 0 and shows 13h undertime on 9/14.
+- [ ] 9/01/2026 departure `6:00` with no 8/31 data imported: shown, credits 0. With 8/31 imported, it pairs with the 8/31 arrival.
+- [ ] EFREN September 1–15, 2026 at grace 0 = `9 days` (4,613 credited min, hand-derived).
+- [ ] Official hours print from the data: `1:00-6:00, 5:00-11:59`.
+- [ ] Day-employee DTRs (HRMO) are unchanged.
+
+**Rejects when:**
+- [ ] A night-shift row is skipped on import.
+- [ ] A night-shift row with times on a weekend or holiday shows the label instead of the times.
+- [ ] Minutes before the P.M. `On duty` or after the A.M. `Off duty` are credited.
+
 ## Out of Scope
-- Shift and night-shift schedules (e.g. the 12:55–6:00 / 4:30–12:05 pattern in the photo). Only Morning/Afternoon sessions are supported.
+- Shift patterns other than day (Morning/Afternoon) and night (P.M. start ending on the next A.M.). Changed 2026-11-10: night shift moved into scope (US-13).
 - Leave management (leave credits, leave applications). Absences are shown blank, not converted to leave.
 - Login, multiple users, network sync, cloud storage.
 - Automatic merging of duplicate employees across AC-Nos. The admin archives the duplicate (US-11).

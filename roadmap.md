@@ -245,3 +245,17 @@ Reopens Phase 0: US-2 example at grace 0. Reopens Phase 1: US-5 grace default 15
 **Done when:** a newly imported office shows Grace minutes `0`, HRMO shows `0` after the update, LAZARO 7/06/2026 shows 0h 14m undertime, and RONIE 7/02/2026 shows 0h 3m.
 
 Deliberately not built, and why: removing the grace setting (admin chose default 0, not removal), morning-only late, daily rate, late deduction, red late arrivals, and T.O./leave marks (pending, not yet amended into the spec).
+
+### Phase 8 — Night shift LATER
+
+Covers US-13, with the US-1, US-2, US-6, and US-7 changes it makes.
+Reopens Phase 0: rows placed by `On duty`, night-shift computation. Reopens Phase 3: adjustments on weekend and holiday night-shift rows. Reopens Phase 6: night-shift rows show times on weekends and holidays.
+
+- `NIGHT_shift.xls` imports all 30 rows
+- A night shift is credited across midnight, split between the start-day P.M. row and the next-day A.M. row
+- Night-shift rows show their times and count on weekends and holidays
+- Day-employee DTRs stay the same
+
+**Done when:** EFREN ALCANTARA September 1–15, 2026 shows `9 days`, 9/02 `5:12` and 9/03 `6:01`, Saturday 9/05 shows `6:00`, and the HRMO July 2026 DTRs match their Phase 7 values.
+
+Deliberately not built, and why: other shift patterns (out of scope), removing grace (admin: not yet), and the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
