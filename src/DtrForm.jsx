@@ -5,7 +5,9 @@ const hours = (min) => (min ? String(Math.floor(min / 60)) : '');
 const mins = (min) => (min ? String(min % 60) : '');
 
 // onDayClick (app view only) makes day numbers buttons; dayName(day) gives their label, e.g. "July 1, 2026".
-export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName }) {
+// showTotals false (US-14) blanks the undertime cells and the Total row values, keeping the columns and rows.
+export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName, showTotals }) {
+  const shown = (text) => (showTotals ? text : '');
   const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted'].filter(Boolean).join(' ') || undefined;
   // The form keeps the template's printed rows (16-31 even in a 30-day month).
   // computeDtr already blanks days outside the period, so only the half is chosen here.
@@ -81,19 +83,19 @@ export default function DtrForm({ name, periodText, officialHours, half, result,
                   <td className={cls(r, 'pmOut', 'sep')}>{r.pmOut}</td>
                 </>
               )}
-              <td>{hours(r.undertime)}</td>
-              <td>{mins(r.undertime)}</td>
+              <td>{shown(hours(r.undertime))}</td>
+              <td>{shown(mins(r.undertime))}</td>
             </tr>
           ))}
           <tr className="total">
             <td colSpan={5}>
               <div className="total-line">
                 <span>Total</span>
-                <span className="days">{result.days} days</span>
+                <span className="days">{shown(`${result.days} days`)}</span>
               </div>
             </td>
-            <td>{hours(result.totalUndertime)}</td>
-            <td>{mins(result.totalUndertime)}</td>
+            <td>{shown(hours(result.totalUndertime))}</td>
+            <td>{shown(mins(result.totalUndertime))}</td>
           </tr>
         </tbody>
       </table>
