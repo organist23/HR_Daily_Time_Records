@@ -3,7 +3,7 @@
 - **Date:** 2026-11-10
 - **Driver:** Playwright `_electron` (E2E), Vitest (unit)
 - **Branch:** `phase-8-night-shift`
-- **Result:** 133/133 unit, 19/19 E2E (full run)
+- **Result:** 137/137 unit, 19/19 E2E (full run)
 
 ## Test scope as run
 
@@ -46,6 +46,16 @@ Full E2E run: yes, the diff changes a business rule (computation) and functions 
 | No late on night shifts | 3 unit |
 | Store refuses night rows on off days | 1 unit, 1 E2E |
 | UI refuses labeled night rows | 1 E2E (after adding the 9/15 holiday case: the first version stayed green because 9/05 has times and no label) |
+
+## Review fixes (each with a test that went red when the fix was removed)
+
+- Import: a second row for the same AC-No, date, and session in one file is skipped and counted, instead of overwriting the first (a third timetable such as overtime would otherwise replace the Afternoon row).
+- A weekend or holiday night start with no arrival but a next-day departure keeps its 13h undertime (it used to keep the label and drop the undertime).
+- A day after a night start is a night row even when the device wrote no A.M. row, so the UI allows the adjustment the store accepts.
+- `adjustDay` sees a night start that exists only as an adjustment.
+- After the fixes: 137/137 unit, 19/19 E2E (full run).
+
+Not fixed, noted as limits (outside the data and spec): a single-row 15:00–23:59 schedule, row order when a device exports a third timetable before the Afternoon row, day-rule P.M. times typed on a guard's weekend, and night shifts ending at `00:00`.
 
 ## Notes
 
