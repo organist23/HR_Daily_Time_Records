@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as XLSX from 'xlsx';
 import { readSheetRows } from '../../src/lib/parse.js';
-import { tmpDir, HRMO, launch, importFiles, employeeButtons } from './helpers.js';
+import { tmpDir, HRMO, launch, importFiles, employeeButtons, showTotals } from './helpers.js';
 
 test('US-1 import per office, persist, re-import, bad files', async () => {
   const dir = tmpDir();
@@ -67,6 +67,7 @@ test('US-3 preview single-copy DTR for a period', async () => {
   await expect(page.getByText('Select an employee to preview their DTR.')).toBeVisible();
 
   await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await showTotals(page);
   const form = page.locator('.dtr-form');
   await expect(form).toHaveCount(1);
   await expect(page.getByLabel('Month', { exact: true })).toHaveValue('7');

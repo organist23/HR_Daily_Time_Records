@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { tmpDir, launch, importHrmo } from './helpers.js';
+import { tmpDir, launch, importHrmo, showTotals } from './helpers.js';
 
 const openRonieFirstHalf = async (page) => {
   await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await showTotals(page);
   await page.getByRole('radio', { name: '1–15' }).check();
 };
 

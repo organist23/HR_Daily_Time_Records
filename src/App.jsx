@@ -25,7 +25,7 @@ const NO_ADJUSTMENTS = {};
 const isActive = (data, emp) => Boolean(emp) && !emp.archived && !data.offices[emp.office]?.archived;
 
 // records: archive and delete actions from App. The preview uses only the archive ones.
-function Preview({ data, employee, onDataChange, onNotice, records }) {
+function Preview({ data, employee, onDataChange, onNotice, records, showTotals, onShowTotals }) {
   const device = useMemo(() => punchesOf(data, employee), [data, employee]);
   const adjustments = data.adjustments ?? NO_ADJUSTMENTS;
   // Everything shown or printed uses device punches with the admin's adjustments applied.
@@ -195,6 +195,8 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
             onChange={(e) => setInCharge(e.target.value)} />
         </label>
         <button onClick={() => setEditing(true)}>Office settings</button>
+        {/* US-14: hides the undertime cells and the Total row values on screen, print, and PDF. */}
+        <button disabled={working || !!batch} onClick={() => onShowTotals(!showTotals)}>{showTotals ? 'Hide' : 'Show'} undertime and total</button>
         <div className="record-actions">
           {/* Disabled during a print or PDF job: closing the preview mid-job would lose its result. */}
           {/* No delete here: delete is offered only in the Archived view, to avoid accidents. */}
@@ -212,14 +214,14 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
       <div className="page main-page">
         <DtrForm name={employee.name} periodText={periodText}
           officialHours={officialHours(punches, year, month)} half={half} result={result} inCharge={inCharge}
-          onDayClick={openAdjust} dayName={dayName} />
+          onDayClick={openAdjust} dayName={dayName} showTotals={showTotals} />
       </div>
       {batch && (
         <div className="print-batch" aria-hidden="true">
           {officePages.map(({ e, p, result: r }) => (
             <div className="page" key={`${e.office}|${e.acNo}`}>
               <DtrForm name={e.name} periodText={periodText} officialHours={officialHours(p, year, month)}
-                half={half} result={r} inCharge={inCharge} />
+                half={half} result={r} inCharge={inCharge} showTotals={showTotals} />
             </div>
           ))}
         </div>
@@ -271,6 +273,7 @@ export default function App() {
   const [view, setView] = useState('dtr'); // 'dtr' | 'holidays' | 'archived'
   const [officeFilter, setOfficeFilter] = useState(''); // '' = all offices
   const [search, setSearch] = useState('');
+  const [showTotals, setShowTotals] = useState(false); // US-14: hidden at every start, kept across employees
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, busyLabel?, run, onCancel? } for a delete or restore
 
   useEffect(() => {
@@ -539,7 +542,7 @@ export default function App() {
           {/* Kept mounted while hidden so the chosen period and override survive a visit to Holidays. */}
           <div hidden={view !== 'dtr'}>
             {employee ? (
-              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} records={records} />
+              <Preview key={selected} data={data} employee={employee} onDataChange={setData} onNotice={setMessages} records={records} showTotals={showTotals} onShowTotals={setShowTotals} />
             ) : (
               <p className="muted empty-hint">Select an employee to preview their DTR.</p>
             )}

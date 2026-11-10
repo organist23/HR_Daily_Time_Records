@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
-import { tmpDir, launch, importFiles } from './helpers.js';
+import { tmpDir, launch, importFiles, showTotals } from './helpers.js';
 
 // US-13 night shift. Hand-derived from sample_data/NIGHT_shift.xls (EFREN ALCANTARA #479), grace 0 (default):
 //   a shift is P.M. 17:00-23:59 (Clock In) on day D + A.M. 01:00-06:00 (Clock Out) on D+1, credited through midnight.
@@ -15,6 +15,7 @@ const total = (page) => page.locator('.dtr-form tr.total');
 
 async function openEfren(page) {
   await page.getByRole('button', { name: /EFREN ALCANTARA/ }).click();
+  await showTotals(page);
   await page.getByLabel('Month', { exact: true }).selectOption('9');
   await page.getByLabel('Year', { exact: true }).fill('2026');
   await page.getByRole('radio', { name: '1–15' }).check();
