@@ -37,6 +37,29 @@ function session(p, graceMinutes) {
   return { undertime, credited: length - undertime };
 }
 
+// ISO date plus n days.
+const shiftDate = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+
+// US-13: a P.M. row ending at 23:59 starts a night shift that ends on the next day's A.M. row.
+export const isNightStart = (p) => p?.session === 'PM' && p.offDuty === '23:59';
+
+// One night shift, credited straight through midnight: start row up to 24:00, end row from 00:00.
+// Missing arrival or departure: the whole shift is undertime on the start row.
+function nightShift(start, end, graceMinutes) {
+  const zero = { undertime: 0, credited: 0 };
+  const startLen = 1440 - minutes(start.onDuty);
+  const endLen = end ? minutes(end.offDuty) : 0;
+  if (!start.in && !end?.out) return { start: zero, end: zero }; // absent
+  if (!start.in || !end?.out) return { start: { undertime: startLen + endLen, credited: 0 }, end: zero };
+  const lateBy = minutes(start.in) - minutes(start.onDuty);
+  const late = Math.min(startLen, lateBy > graceMinutes ? lateBy : 0);
+  const early = Math.min(endLen, Math.max(0, minutes(end.offDuty) - minutes(end.out)));
+  return {
+    start: { undertime: late, credited: startLen - late },
+    end: { undertime: early, credited: endLen - early },
+  };
+}
+
 // Device punches with the admin's adjustments laid over them. adjusted.in/out mark changed cells.
 export function effectivePunches(punches, adjustments, office, acNo) {
   const prefix = `${office}|${acNo}|`;
@@ -85,18 +108,27 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
     const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
-      // Non-working day: the label always wins, with no times, credit, or undertime.
-      row.label = offDayLabel(date, holidays);
+      const am = byKey.get(`${date}|AM`);
+      const pm = byKey.get(`${date}|PM`);
+      // A night shift starts on this P.M. row, or ended on this A.M. row (started the day before).
+      const prevPm = byKey.get(`${shiftDate(date, -1)}|PM`);
+      const amNight = Boolean(am) && isNightStart(prevPm);
+      const pmNight = isNightStart(pm);
+      if (amNight || pmNight) row.night = true;
+      const hasTimes = (p) => Boolean(p && (p.in || p.out));
+      // Non-working day: the label wins, with no times, credit, or undertime, unless night-shift times exist.
+      const nightTimes = (amNight && hasTimes(am)) || (pmNight && hasTimes(pm));
+      row.label = nightTimes ? '' : offDayLabel(date, holidays);
       if (!row.label) {
-        const am = byKey.get(`${date}|AM`);
-        const pm = byKey.get(`${date}|PM`);
         Object.assign(row, {
           amIn: formatTime(am?.in), amOut: formatTime(am?.out),
           pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
           adjusted: [[am, 'in', 'amIn'], [am, 'out', 'amOut'], [pm, 'in', 'pmIn'], [pm, 'out', 'pmOut']]
             .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
         });
-        for (const s of [session(am, graceMinutes), session(pm, graceMinutes)]) {
+        const amPart = amNight ? nightShift(prevPm, am, graceMinutes).end : session(am, graceMinutes);
+        const pmPart = pmNight ? nightShift(pm, byKey.get(`${shiftDate(date, 1)}|AM`), graceMinutes).start : session(pm, graceMinutes);
+        for (const s of [amPart, pmPart]) {
           row.undertime += s.undertime;
           credited += s.credited;
         }
