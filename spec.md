@@ -34,6 +34,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Shift hours** run from the P.M. row's `On duty` to the next A.M. row's `Off duty`, straight through midnight (17:00 → 06:00 = 13h).
 - **Credited minutes** = time from arrival to departure inside the shift hours, split at midnight: start-day row up to 24:00, next-day row from 00:00. Example: 17:12 → 06:01 credits 408 + 360 = 768 min.
 - **Late** = arrival − P.M. `On duty`, with the office grace. **Early** = A.M. `Off duty` − departure.
+- **Early-morning punch filed as Clock In**: the A.M. row of a night shift only ever holds the departure. When it has a Clock In but no Clock Out, that Clock In is the departure and shows in the A.M. Departure cell. Evidence from `sample_data/GSO_.xls`: RENATO NUESTRO JR 10/06 `night guard 2` Clock In 05:57, REYGAN SANNIE 10/10 Clock In 05:58, both with a blank Clock Out. The device files a punch before the 06:00 Off duty under Clock In. Added 2026-11-10 (US-13 changed).
 - **Missing arrival or departure**: the shift credits 0 and its undertime is the whole shift (13h), on the start-day row. The admin fixes it with an adjustment.
 - **Weekends and holidays**: a row with night-shift times shows the times and counts like any day. A row with no night-shift times still shows the label.
 - **Days total** uses the same rule as day employees: floor(credited ÷ 480).
@@ -206,6 +207,7 @@ Changed 2026-11-09: Delete is offered only in the Archived view, so a record mus
 - [ ] Restoring an invalid or corrupt file changes any current data.
 
 ### US-13: Night shift
+Changed 2026-11-10: a lone Clock In on the A.M. row of a night shift is the departure (device files punches before 06:00 under Clock In).
 **As** admin, **I want** night-shift guards' files imported and computed, **so that** guards get a correct DTR like day employees.
 
 **Accepts when:**
@@ -217,6 +219,7 @@ Changed 2026-11-09: Delete is offered only in the Archived view, so a record mus
 - [ ] EFREN September 1–15, 2026 at grace 0 = `9 days` (4,613 credited min, hand-derived).
 - [ ] Official hours print from the data: `1:00-6:00, 5:00-11:59`.
 - [ ] Day-employee DTRs (HRMO) are unchanged.
+- [ ] `GSO_.xls` RENATO NUESTRO JR (519): 10/05 arrival `4:04` and 10/06 Clock In 05:57 make one shift. 10/06 shows A.M. Departure `5:57` (Arrival blank), and the shift credits 777 min (420 + 357) with 3 min early. Added 2026-11-10.
 
 **Rejects when:**
 - [ ] A night-shift row is skipped on import.

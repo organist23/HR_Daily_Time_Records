@@ -294,3 +294,18 @@ Conventions later phases inherit:
 - A row's session comes from its `On duty` (before 12:00 is A.M.), never from the Timetable name.
 - A night shift is a P.M. row with `Off duty` `23:59` plus the next day's A.M. row. Code that reads a day's times must check `row.night` before treating a weekend or holiday as non-working.
 - Night credit is split at midnight onto the two rows, so each half-month period counts only its own rows.
+
+## Part three — Night-shift device fixes
+
+### Phase 9 — Early departure filed as Clock In NEXT
+
+Covers US-13 (changed 2026-11-10).
+Reopens Phase 8: a lone Clock In on a night shift's A.M. row is the departure.
+
+- RENATO 10/05 → 10/06 05:57 and REYGAN 10/09 → 10/10 05:58 count as complete shifts
+- The punch shows in the A.M. Departure cell
+- Day-employee DTRs and the `NIGHT_shift.xls` values stay the same
+
+**Done when:** importing `sample_data/GSO_.xls` shows RENATO 10/06 A.M. Departure `5:57`, his 10/05 shift credits 777 min, and EFREN's `NIGHT_shift.xls` September 1–15 is still `9 days`.
+
+Deliberately not built, and why: the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
