@@ -95,6 +95,20 @@ test('US-5 existing offices are set to grace 0 once, after a copy of the data', 
   expect(graceCopies(dir)).toHaveLength(1);
 });
 
+test('US-5 a broken version 1 data file shows an error and is left as it was', async () => {
+  const dir = tmpDir();
+  const broken = Buffer.from('{"version":1}'); // no offices map
+  fs.writeFileSync(dataPath(dir), broken);
+  const { app, page } = await launch(dir);
+  try {
+    await expect(page.getByText(/Could not update .*dtr-data\.json to grace 0/)).toBeVisible();
+  } finally {
+    await app.close();
+  }
+  expect(fs.readFileSync(dataPath(dir)).equals(broken)).toBe(true);
+  expect(graceCopies(dir)).toHaveLength(0);
+});
+
 test('US-5 restoring a backup made before the update sets grace 0', async () => {
   const dir = tmpDir();
   const backup = path.join(tmpDir(), 'old-backup.json');

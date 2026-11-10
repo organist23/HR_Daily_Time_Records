@@ -120,10 +120,13 @@ const copyCurrent = (name) => {
 };
 
 // Grace default 0 (US-5, 2026-11-10): version 1 data is copied first, then every office is set to 0 once.
-if (data && migrateGrace(data)) {
+// Only the instance holding the lock writes. migrateGrace returns true only for data read from currentFile.
+if (hasLock && data) {
   try {
-    if (fs.existsSync(currentFile)) copyCurrent(copyName(new Date(), 'grace-0'));
-    saveData(dataDir, data);
+    if (migrateGrace(data)) {
+      copyCurrent(copyName(new Date(), 'grace-0'));
+      saveData(dataDir, data);
+    }
   } catch (e) {
     data = null;
     loadError = `Could not update ${currentFile} to grace 0: ${e.message}`;
