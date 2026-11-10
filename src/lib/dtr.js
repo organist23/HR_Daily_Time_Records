@@ -112,12 +112,14 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
       const pm = byKey.get(`${date}|PM`);
       // A night shift starts on this P.M. row, or ended on this A.M. row (started the day before).
       const prevPm = byKey.get(`${shiftDate(date, -1)}|PM`);
-      const amNight = Boolean(am) && isNightStart(prevPm);
+      const nextAm = byKey.get(`${shiftDate(date, 1)}|AM`);
+      const amNight = isNightStart(prevPm);
       const pmNight = isNightStart(pm);
       if (amNight || pmNight) row.night = true;
       const hasTimes = (p) => Boolean(p && (p.in || p.out));
       // Non-working day: the label wins, with no times, credit, or undertime, unless night-shift times exist.
-      const nightTimes = (amNight && hasTimes(am)) || (pmNight && hasTimes(pm));
+      // A start row counts its shift's departure too, so a missing arrival still charges the shift.
+      const nightTimes = (amNight && hasTimes(am)) || (pmNight && (hasTimes(pm) || hasTimes(nextAm)));
       row.label = nightTimes ? '' : offDayLabel(date, holidays);
       if (!row.label) {
         Object.assign(row, {
@@ -127,7 +129,7 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
             .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
         });
         const amPart = amNight ? nightShift(prevPm, am, graceMinutes).end : session(am, graceMinutes);
-        const pmPart = pmNight ? nightShift(pm, byKey.get(`${shiftDate(date, 1)}|AM`), graceMinutes).start : session(pm, graceMinutes);
+        const pmPart = pmNight ? nightShift(pm, nextAm, graceMinutes).start : session(pm, graceMinutes);
         for (const s of [amPart, pmPart]) {
           row.undertime += s.undertime;
           credited += s.credited;

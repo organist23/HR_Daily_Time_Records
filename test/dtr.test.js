@@ -291,6 +291,18 @@ describe('night shift (US-13)', () => {
     expect(sept(p, 'second').credited).toBe(360);
   });
 
+  it('a weekend start with no arrival keeps the 13h undertime (review)', () => {
+    const d = sept([night('2026-09-19', 'PM', '17:00', '23:59', '', ''), night('2026-09-20', 'AM', '01:00', '06:00', '', '06:00')], 'second');
+    expect(d.rows[18]).toMatchObject({ label: '', pmIn: '', undertime: 780 });
+    expect(d.rows[19]).toMatchObject({ label: '', amOut: '6:00', undertime: 0 });
+  });
+
+  it('a day after a night start with no A.M. row is still a night row (review)', () => {
+    const d = sept([night('2026-09-18', 'PM', '17:00', '23:59', '17:00', '')], 'second');
+    expect(d.rows[18]).toMatchObject({ label: 'SATURDAY', night: true });
+    expect(d.rows[17].undertime).toBe(420); // no end row: only the 17:00-24:00 part is known
+  });
+
   it('official hours come from the data', () => {
     expect(officialHours(efren, 2026, 9)).toBe('1:00-6:00, 5:00-11:59');
   });

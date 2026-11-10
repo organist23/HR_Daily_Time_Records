@@ -147,7 +147,11 @@ export function adjustDay(data, { office, acNo, date, am, pm, reason }, at) {
   if (!isIsoDate(date)) throw new Error('Invalid date');
   // Holidays and weekends always show their label, so their times cannot be adjusted,
   // except a guard's night-shift rows (a night shift starts that day or the day before, US-13).
-  const pmOf = (d) => data.punches[`${office}|${acNo}|${d}|PM`];
+  // The P.M. row as shown: an adjustment (which keeps its own hours) wins over the device row.
+  const pmOf = (d) => {
+    const key = `${office}|${acNo}|${d}|PM`;
+    return data.adjustments?.[key] ? { session: 'PM', ...data.adjustments[key] } : data.punches[key];
+  };
   const night = isNightStart(pmOf(date)) || isNightStart(pmOf(shiftDate(date, -1)));
   if (!night && offDayLabel(date, data.holidays)) throw new Error(`${date} is a non-working day`);
   const sessions = { AM: am ?? {}, PM: pm ?? {} };
