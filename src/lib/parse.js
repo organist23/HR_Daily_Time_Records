@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { isNightStart, shiftDate } from './dtr.js';
 
 const REQUIRED = ['AC-No.', 'Name', 'Date', 'Timetable', 'On duty', 'Off duty', 'Clock In', 'Clock Out'];
 // 24h "8:05" / "08:05:00", or 12h "8:05 AM" as Excel formats real time cells.
@@ -64,6 +65,15 @@ export function parseRows(rows) {
     else {
       seen.add(key);
       records.push(rec);
+    }
+  }
+  // US-13: the A.M. row of a night shift only holds the departure, but the device files a punch before
+  // 06:00 under Clock In (GSO_.xls 10/06 05:57). A lone Clock In there is stored as the Clock Out.
+  const nightStart = new Set(records.filter(isNightStart).map((r) => `${r.acNo}|${r.date}`));
+  for (const r of records) {
+    if (r.session === 'AM' && r.in && !r.out && nightStart.has(`${r.acNo}|${shiftDate(r.date, -1)}`)) {
+      r.out = r.in;
+      r.in = '';
     }
   }
   return { records, skipped };
