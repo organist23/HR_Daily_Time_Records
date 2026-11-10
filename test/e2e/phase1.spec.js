@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tmpDir, launch, importHrmo } from './helpers.js';
+import { tmpDir, launch, importHrmo, showTotals } from './helpers.js';
 
 test('US-5 in-charge name and grace per office, one-print override', async () => {
   const dir = tmpDir();
   let { app, page } = await launch(dir);
   await importHrmo(app, page);
   await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await showTotals(page);
   await page.getByRole('radio', { name: '1–15' }).check();
   const form = page.locator('.dtr-form');
   const inChargeLine = form.locator('.in-charge-name');
@@ -48,6 +49,7 @@ test('US-5 in-charge name and grace per office, one-print override', async () =>
 
   ({ app, page } = await launch(dir));
   await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await showTotals(page);
   await expect(page.locator('.dtr-form .in-charge-name')).toHaveText('MARIVIC P. SARINAS');
   await page.getByRole('button', { name: 'Office settings' }).click();
   od = page.getByRole('dialog', { name: 'Office settings — HRMO' }); // bound to the relaunched window

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tmpDir, launch, importHrmo } from './helpers.js';
+import { tmpDir, launch, importHrmo, showTotals } from './helpers.js';
 
 // US-5 Changed 2026-11-10: grace defaults to 0, and existing offices are set to 0 after a copy of the data.
 // Hand-derived from sample_data/HRMO (3).xls raw rows:
@@ -14,6 +14,7 @@ const minutesCell = (page, day) => page.locator(`.dtr-form tr[data-day="${day}"]
 
 async function openFirstHalf(page, name) {
   await page.getByRole('button', { name }).click();
+  await showTotals(page);
   await page.getByRole('radio', { name: '1–15' }).check();
 }
 

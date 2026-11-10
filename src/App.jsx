@@ -196,7 +196,7 @@ function Preview({ data, employee, onDataChange, onNotice, records, showTotals, 
         </label>
         <button onClick={() => setEditing(true)}>Office settings</button>
         {/* US-14: hides the undertime cells and the Total row values on screen, print, and PDF. */}
-        <button onClick={() => onShowTotals(!showTotals)}>{showTotals ? 'Hide' : 'Show'} undertime and total</button>
+        <button disabled={working || !!batch} onClick={() => onShowTotals(!showTotals)}>{showTotals ? 'Hide' : 'Show'} undertime and total</button>
         <div className="record-actions">
           {/* Disabled during a print or PDF job: closing the preview mid-job would lose its result. */}
           {/* No delete here: delete is offered only in the Archived view, to avoid accidents. */}

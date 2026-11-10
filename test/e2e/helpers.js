@@ -28,6 +28,14 @@ export async function importFiles(app, page, files) {
   return page.getByRole('dialog', { name: 'Import Excel files' });
 }
 
+// US-14: undertime and total are hidden at every start. Shows them (no-op when already shown).
+export async function showTotals(page) {
+  const toggle = page.getByRole('button', { name: /^(Show|Hide) undertime and total$/ });
+  await toggle.waitFor(); // the preview toolbar has rendered
+  if ((await toggle.textContent()).startsWith('Show')) await toggle.click();
+  await page.getByRole('button', { name: 'Hide undertime and total' }).waitFor();
+}
+
 export const employeeButtons = (page) => page.getByRole('navigation', { name: 'Employees' }).getByRole('button');
 
 export async function importHrmo(app, page) {

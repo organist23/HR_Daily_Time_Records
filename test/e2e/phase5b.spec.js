@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tmpDir, launch, importHrmo, employeeButtons } from './helpers.js';
+import { tmpDir, launch, importHrmo, employeeButtons, showTotals } from './helpers.js';
 
 // The OS dialogs are the outer boundary.
 const mockSave = (app, p) => app.evaluate(({ dialog }, file) => {
@@ -15,6 +15,7 @@ const dataFile = (dir) => fs.readFileSync(path.join(dir, 'dtr-data.json'), 'utf8
 
 const openRonieFirstHalf = async (page) => {
   await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
+  await showTotals(page);
   await page.getByRole('radio', { name: '1–15' }).check();
 };
 const julyHolidays = async (page) => {

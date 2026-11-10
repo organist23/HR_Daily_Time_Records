@@ -36,8 +36,27 @@ test('US-14 undertime and total are hidden by default, shown on demand, and hidd
     await expect(toggle).toBeHidden();
     await page.emulateMedia({ media: null });
 
+    // Print office (system print dialog mocked) renders the whole office in the same state.
+    // The mock records how many of the 11 pages print a days total when print is called.
+    await app.evaluate(({ BrowserWindow }) => {
+      const wc = BrowserWindow.getAllWindows()[0].webContents;
+      wc.print = async (opts, cb) => {
+        const r = await wc.executeJavaScript(`({
+          pages: document.querySelectorAll('.print-batch .page').length,
+          withDays: [...document.querySelectorAll('.print-batch .days')].filter((e) => e.textContent.includes('days')).length,
+          toggleLocked: [...document.querySelectorAll('button')].find((b) => b.textContent.endsWith('undertime and total')).disabled,
+        })`);
+        globalThis.printCalls = [...(globalThis.printCalls || []), r];
+        cb(true, '');
+      };
+    });
+    await page.getByRole('button', { name: 'Print office' }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.printCalls)).toEqual([{ pages: 11, withDays: 0, toggleLocked: true }]);
+
     await toggle.click();
     await expect(page.getByRole('button', { name: 'Hide undertime and total' })).toBeVisible();
+    await page.getByRole('button', { name: 'Print office' }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.printCalls)).toEqual([{ pages: 11, withDays: 0, toggleLocked: true }, { pages: 11, withDays: 11, toggleLocked: true }]);
     await expect(day1(page, 1)).toHaveText('8:00');
     await expect(day1(page, 5)).toHaveText('4');
     await expect(total(page)).toContainText('2 days');
@@ -45,6 +64,7 @@ test('US-14 undertime and total are hidden by default, shown on demand, and hidd
 
     // Stays shown across employees for this session.
     await page.getByRole('button', { name: /JOHN RYAN A\. LAZARO/ }).click();
+    await expect(total(page)).toContainText('days'); // LAZARO's own form
     await openRonie(page);
     await expect(total(page)).toContainText('2 days');
 

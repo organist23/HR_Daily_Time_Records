@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
-import { tmpDir, launch, importFiles } from './helpers.js';
+import { tmpDir, launch, importFiles, showTotals } from './helpers.js';
 
 // US-13 Changed 2026-11-10. Hand-derived from sample_data/GSO_.xls raw rows (RENATO NUESTRO JR #519), grace 0:
 //   10/05 night guard 1 In 16:04. 10/06 night guard 2 In 05:57, Out blank (device files a pre-06:00 punch as Clock In).
@@ -17,6 +17,7 @@ test('US-13 a night A.M. Clock In before 06:00 counts as the departure', async (
     await expect(page.getByRole('status')).toContainText('GSO_.xls: 2851 added, 0 updated, 0 skipped');
 
     await page.getByRole('button', { name: /RENATO NUESTRO JR/ }).click();
+    await showTotals(page);
     await page.getByLabel('Month', { exact: true }).selectOption('10');
     await page.getByLabel('Year', { exact: true }).fill('2026');
     await page.getByRole('radio', { name: '1–15' }).check();

@@ -6,7 +6,7 @@ const mins = (min) => (min ? String(min % 60) : '');
 
 // onDayClick (app view only) makes day numbers buttons; dayName(day) gives their label, e.g. "July 1, 2026".
 // showTotals false (US-14) blanks the undertime cells and the Total row values, keeping the columns and rows.
-export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName, showTotals }) {
+export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName, showTotals = false }) {
   const shown = (text) => (showTotals ? text : '');
   const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted'].filter(Boolean).join(' ') || undefined;
   // The form keeps the template's printed rows (16-31 even in a 30-day month).

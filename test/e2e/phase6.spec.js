@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { tmpDir, launch, importHrmo } from './helpers.js';
+import { tmpDir, launch, importHrmo, showTotals } from './helpers.js';
 
 // Holidays view helpers. Scoped to the view: the hidden DTR preview has its own Month and Year.
 const openJuly2026Holidays = async (page) => {
@@ -31,6 +31,7 @@ test('US-6 a holiday on a past date with punches shows its label and drops the c
     await importHrmo(app, page);
     const joanne = page.getByRole('button', { name: /JOANNE M ESTRADA/ });
     await joanne.click();
+    await showTotals(page);
     const form = page.locator('.dtr-form');
     const row1 = form.locator('tr[data-day="1"]');
     // JOANNE full July: 6 full days (2880) + 7/09 PM (240) = 3120 → 6 days. 7/09 AM has no departure → 4h.
@@ -75,6 +76,7 @@ test('US-7 holidays and weekends cannot be adjusted, and earlier adjustments sta
     await importHrmo(app, page);
     const ronie = page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ });
     await ronie.click();
+    await showTotals(page);
     await page.getByRole('radio', { name: '1–15' }).check();
     const form = page.locator('.dtr-form');
     const row1 = form.locator('tr[data-day="1"]');
