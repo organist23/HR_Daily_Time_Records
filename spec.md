@@ -226,6 +226,21 @@ Changed 2026-11-10: a lone Clock In on the A.M. row of a night shift is the depa
 - [ ] A night-shift row with times on a weekend or holiday shows the label instead of the times.
 - [ ] Minutes before the P.M. `On duty` or after the A.M. `Off duty` are credited.
 
+### US-14: Show or hide undertime and total
+Added 2026-11-10 (admin request).
+**As** admin, **I want** a button that hides the undertime and total values on the DTR, **so that** I can print DTRs without them.
+
+**Accepts when:**
+- [ ] The DTR toolbar has a **Show undertime and total** / **Hide undertime and total** button. It is a screen control and does not print.
+- [ ] Hidden is the default every time the app starts: each day's undertime Hours and Minutes cells and the Total row's `N days` and undertime cells are blank. The Undertime columns and the Total row stay, so the form layout does not change.
+- [ ] Print, Export PDF, Print office, and Export office PDF use the same state as the screen.
+- [ ] The state applies to every employee and office until the app is closed. Nothing is saved to the data file.
+- [ ] Showing brings back the computed values (RONIE July 1–15: `2 days`, undertime 20h).
+
+**Rejects when:**
+- [ ] Hiding changes any computed value.
+- [ ] Arrival or departure times are hidden.
+
 ## Out of Scope
 - Shift patterns other than day (Morning/Afternoon) and night (P.M. start ending on the next A.M.). Changed 2026-11-10: night shift moved into scope (US-13).
 - Leave management (leave credits, leave applications). Absences are shown blank, not converted to leave.

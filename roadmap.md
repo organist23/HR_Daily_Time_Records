@@ -322,3 +322,17 @@ Deliberately not built, and why: the pending morning-only late, daily rate, dedu
 
 Conventions later phases inherit:
 - Device quirks are corrected once in `parseRows`, so every reader (`computeDtr`, the Adjust dialog, `adjustDay`) sees the same punch. Never correct a punch only for display.
+
+## Part four — DTR display
+
+### Phase 10 — Show or hide undertime and total NEXT
+
+Covers US-14.
+Reopens Phase 0: US-3 preview shows undertime and total blank by default. Reopens Phase 1: US-4 print and PDF follow the toggle.
+
+- One toolbar button toggles the undertime cells, the days total, and the undertime total
+- Hidden at every start, for screen, print, PDF, and office batches
+
+**Done when:** a freshly opened DTR shows blank undertime and Total values, an exported PDF has them blank, Show brings back RONIE July 1–15 `2 days` and 20h, and arrival and departure times show in both states.
+
+Deliberately not built, and why: saving the toggle to the data file (admin chose hidden at every start), and the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
