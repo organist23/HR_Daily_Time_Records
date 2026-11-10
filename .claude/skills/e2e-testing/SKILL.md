@@ -45,12 +45,13 @@ adjustments, and holidays. Every pass gets its own empty temp folder through `DT
 
 - **Hand-derive every number from the raw rows and write the derivation in a comment** before
   running. A value read off the app's own output proves nothing.
-- Known hand-derived anchors (grace 15, July 2026):
+- Known hand-derived anchors (grace 0, the default since Phase 7, July 2026). In the sample only
+  RONIE and LAZARO arrive after on-duty, so only their values depend on grace:
 
 | Employee (AC) | Period | Expected | Why |
 |---|---|---|---|
-| RONIE LOUISE BERMUDEZ (568) | 1–15 | day 1: A.M. arrival `8:00`, departure blank, undertime 4h | 7/01 AM has arrival only, PM absent |
-| JOHN RYAN A. LAZARO (611) | 1–15 | day 8: undertime 18m. Day 6: 0 | 8:18 is past grace. 8:08 and 1:06 are within it |
+| RONIE LOUISE BERMUDEZ (568) | 1–15 | day 1: A.M. arrival `8:00`, departure blank, undertime 4h. Day 2: 3m | 7/01 AM has arrival only, PM absent. 7/02 in 8:01 and 1:02 |
+| JOHN RYAN A. LAZARO (611) | 1–15 | day 8: undertime 18m. Day 6: 14m (0 at grace 15) | 8:18. 8:08 and 1:06 = 8 + 6 |
 | RELITA BARAYA (14) | 1–15 | `6 days`, undertime 4h | 13 full sessions × 240 = 3120 min, floor(3120/480) = 6. 7/03 PM has departure only |
 
 ## During the pass

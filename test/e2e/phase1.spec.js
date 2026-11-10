@@ -12,27 +12,27 @@ test('US-5 in-charge name and grace per office, one-print override', async () =>
   const form = page.locator('.dtr-form');
   const inChargeLine = form.locator('.in-charge-name');
   await expect(inChargeLine).toHaveText('');
-  // RONIE 7/02: arrivals 8:01 and 1:02 are inside the default 15-minute grace.
-  await expect(form.locator('tr[data-day="2"] td').nth(6)).toHaveText('');
+  // RONIE 7/02: arrivals 8:01 and 1:02. Default grace 0 (US-5 Changed 2026-11-10): 1 + 2 = 3 minutes late.
+  await expect(form.locator('tr[data-day="2"] td').nth(6)).toHaveText('3');
 
   await page.getByRole('button', { name: 'Office settings' }).click();
   let od = page.getByRole('dialog', { name: 'Office settings — HRMO' });
-  await expect(od.getByLabel('Grace minutes')).toHaveValue('15');
+  await expect(od.getByLabel('Grace minutes')).toHaveValue('0');
   await od.getByLabel('In-charge name').fill('MARIVIC P. SARINAS');
-  await od.getByLabel('Grace minutes').fill('0');
+  await od.getByLabel('Grace minutes').fill('15');
   await od.getByRole('button', { name: 'Save' }).click();
   await expect(od).toHaveCount(0);
   await expect(inChargeLine).toHaveText('MARIVIC P. SARINAS');
   await expect(page.getByLabel('In charge (this print)')).toHaveValue('MARIVIC P. SARINAS');
-  // Grace 0: 1 + 2 = 3 minutes late on 7/02.
-  await expect(form.locator('tr[data-day="2"] td').nth(6)).toHaveText('3');
+  // Grace 15: both 7/02 arrivals are within it.
+  await expect(form.locator('tr[data-day="2"] td').nth(6)).toHaveText('');
 
   await page.getByLabel('In charge (this print)').fill('JUAN DELA CRUZ');
   await expect(inChargeLine).toHaveText('JUAN DELA CRUZ');
 
   // Saving settings without changing the in-charge name keeps the one-print override.
   await page.getByRole('button', { name: 'Office settings' }).click();
-  await od.getByLabel('Grace minutes').fill('0');
+  await od.getByLabel('Grace minutes').fill('15');
   await od.getByRole('button', { name: 'Save' }).click();
   await expect(od).toHaveCount(0);
   await expect(inChargeLine).toHaveText('JUAN DELA CRUZ');
@@ -52,7 +52,7 @@ test('US-5 in-charge name and grace per office, one-print override', async () =>
   await page.getByRole('button', { name: 'Office settings' }).click();
   od = page.getByRole('dialog', { name: 'Office settings — HRMO' }); // bound to the relaunched window
   await expect(od.getByLabel('In-charge name')).toHaveValue('MARIVIC P. SARINAS');
-  await expect(od.getByLabel('Grace minutes')).toHaveValue('0');
+  await expect(od.getByLabel('Grace minutes')).toHaveValue('15');
   await app.close();
 });
 

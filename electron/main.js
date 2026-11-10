@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSheetRows, parseRows } from '../src/lib/parse.js';
 import {
-  loadData, saveData, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
+  loadData, saveData, migrateGrace, mergeImport, resolveOffice, updateOffice, setHoliday, deleteHoliday, adjustDay, revertDay,
   setArchived, deleteEmployee, deleteOffice, makeBackup, readBackup,
 } from '../src/lib/store.js';
 import { adjustedDayCount } from '../src/lib/dtr.js';
@@ -109,7 +109,26 @@ const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const pad = (n) => String(n).padStart(2, '0');
 let pendingRestore = null; // { data, copy } checked by readBackup; the renderer never sends data to restore
 const currentFile = path.join(dataDir, 'dtr-data.json');
-const copyName = (t) => `dtr-data-before-restore-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
+const copyName = (t, what = 'restore') => `dtr-data-before-${what}-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.json`;
+// Copies the data file byte for byte. Never overwrites an earlier copy: adds -2, -3, … when the name is taken.
+const copyCurrent = (name) => {
+  const base = name.replace(/\.json$/, '');
+  let copy = `${base}.json`;
+  for (let n = 2; fs.existsSync(path.join(dataDir, copy)); n++) copy = `${base}-${n}.json`;
+  fs.copyFileSync(currentFile, path.join(dataDir, copy), fs.constants.COPYFILE_EXCL);
+  return copy;
+};
+
+// Grace default 0 (US-5, 2026-11-10): version 1 data is copied first, then every office is set to 0 once.
+if (data && migrateGrace(data)) {
+  try {
+    if (fs.existsSync(currentFile)) copyCurrent(copyName(new Date(), 'grace-0'));
+    saveData(dataDir, data);
+  } catch (e) {
+    data = null;
+    loadError = `Could not update ${currentFile} to grace 0: ${e.message}`;
+  }
+}
 
 ipcMain.handle('backup', async (event) => {
   if (loadError) throw new Error(loadError);
@@ -157,11 +176,7 @@ ipcMain.handle('restore-apply', () => {
   if (!pendingRestore) throw new Error('No backup picked');
   let copy = null;
   if (fs.existsSync(currentFile)) { // checked now, not at pick time
-    // Never overwrite an earlier copy: add -2, -3, … when the name is taken.
-    const base = (pendingRestore.copy ?? copyName(new Date())).replace(/\.json$/, '');
-    copy = `${base}.json`;
-    for (let n = 2; fs.existsSync(path.join(dataDir, copy)); n++) copy = `${base}-${n}.json`;
-    fs.copyFileSync(currentFile, path.join(dataDir, copy), fs.constants.COPYFILE_EXCL);
+    copy = copyCurrent(pendingRestore.copy ?? copyName(new Date()));
   }
   saveData(dataDir, pendingRestore.data);
   data = pendingRestore.data;

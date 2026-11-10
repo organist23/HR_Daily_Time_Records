@@ -52,6 +52,7 @@ test('US-1 import per office, persist, re-import, bad files', async () => {
 test('US-1 cancel import with Escape saves nothing', async () => {
   const { app, page } = await launch(tmpDir());
   const dlg = await importFiles(app, page, [HRMO]);
+  await expect(dlg).toBeVisible(); // its Escape listener mounts with it; an earlier Escape is lost
   await page.keyboard.press('Escape');
   await expect(dlg).toHaveCount(0);
   await expect(page.getByText('No records yet. Import an Excel file to start.')).toBeVisible();
