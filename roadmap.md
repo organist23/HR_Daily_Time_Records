@@ -233,7 +233,7 @@ Conventions later phases inherit:
 
 ## Part two — LGU computation rules
 
-### Phase 7 — Grace default 0 NEXT
+### Phase 7 — Grace default 0 ✅ DONE (merged `c5582fb`, 2026-11-10)
 
 Covers US-5 (changed 2026-11-10), with the US-2 example it changes.
 Reopens Phase 0: US-2 example at grace 0. Reopens Phase 1: US-5 grace default 15 → 0.
@@ -242,11 +242,28 @@ Reopens Phase 0: US-2 example at grace 0. Reopens Phase 1: US-5 grace default 15
 - On first start after the update, every existing office is set to grace 0, after a dated copy of the data is saved
 - Office settings still lets the admin set grace per office
 
-**Done when:** a newly imported office shows Grace minutes `0`, HRMO shows `0` after the update, LAZARO 7/06/2026 shows 0h 14m undertime, and RONIE 7/02/2026 shows 0h 3m.
+**Done when:** a newly imported office shows Grace minutes `0`, HRMO shows `0` after the update, LAZARO 7/06/2026 shows 0h 14m undertime, and RONIE 7/02/2026 shows 0h 3m. — **Verified** on 2026-11-10 with Playwright `_electron` and Vitest: 120/120 unit, 18/18 E2E (full run). Checked:
+- new office at grace 0, with RONIE 7/02 at 3m and LAZARO 7/06 at 14m
+- a version 1 data file with HRMO at 15 shows 0, and its copy is byte-equal to the original
+- the update runs once, and a later grace of 15 survives a relaunch
+- an old backup restores at grace 0
+- a broken version 1 file shows an error and is left untouched
+
+Results: `docs/test-results/PHASE-7-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/store.js`: `migrateGrace`, plus `emptyData` (version 2), the `mergeImport` office default, and `makeBackup`/`readBackup` (data version 1 or 2).
+- `electron/main.js`: the startup grace migration, and `copyCurrent` shared with `restore-apply`.
+- React UI: grace fallbacks `?? 0` in `src/App.jsx` and `src/OfficeDialog.jsx`.
 
 Deliberately not built, and why: removing the grace setting (admin chose default 0, not removal), morning-only late, daily rate, late deduction, red late arrivals, and T.O./leave marks (pending, not yet amended into the spec).
 
-### Phase 8 — Night shift LATER
+Conventions later phases inherit:
+- Data `version` is 2. A later data change bumps it and migrates in both places old data arrives: the startup block in `main.js` and `readBackup`.
+- Startup changes to the data file copy it first with `copyCurrent(copyName(new Date(), '<what>'))`, and only the instance holding the single-instance lock writes.
+- A failed startup update sets `loadError` and leaves the file untouched (admin decision 2026-11-10: block rather than run on half-updated data).
+
+### Phase 8 — Night shift NEXT
 
 Covers US-13, with the US-1, US-2, US-6, and US-7 changes it makes.
 Reopens Phase 0: rows placed by `On duty`, night-shift computation. Reopens Phase 3: adjustments on weekend and holiday night-shift rows. Reopens Phase 6: night-shift rows show times on weekends and holidays.
