@@ -263,7 +263,7 @@ Conventions later phases inherit:
 - Startup changes to the data file copy it first with `copyCurrent(copyName(new Date(), '<what>'))`, and only the instance holding the single-instance lock writes.
 - A failed startup update sets `loadError` and leaves the file untouched (admin decision 2026-11-10: block rather than run on half-updated data).
 
-### Phase 8 — Night shift NEXT
+### Phase 8 — Night shift ✅ DONE (merged `3d3f70f`, 2026-11-10)
 
 Covers US-13, with the US-1, US-2, US-6, and US-7 changes it makes.
 Reopens Phase 0: rows placed by `On duty`, night-shift computation. Reopens Phase 3: adjustments on weekend and holiday night-shift rows. Reopens Phase 6: night-shift rows show times on weekends and holidays.
@@ -273,6 +273,24 @@ Reopens Phase 0: rows placed by `On duty`, night-shift computation. Reopens Phas
 - Night-shift rows show their times and count on weekends and holidays
 - Day-employee DTRs stay the same
 
-**Done when:** EFREN ALCANTARA September 1–15, 2026 shows `9 days`, 9/02 `5:12` and 9/03 `6:01`, Saturday 9/05 shows `6:00`, and the HRMO July 2026 DTRs match their Phase 7 values.
+**Done when:** EFREN ALCANTARA September 1–15, 2026 shows `9 days`, 9/02 `5:12` and 9/03 `6:01`, Saturday 9/05 shows `6:00`, and the HRMO July 2026 DTRs match their Phase 7 values. — **Verified** on 2026-11-10 with Playwright `_electron` and Vitest: 137/137 unit, 19/19 E2E (full run). Checked:
+- `NIGHT_shift.xls` imports 30 rows, 0 skipped
+- EFREN September 1–15: `9 days`, undertime 19h 7m, 9/02 `5:12`, 9/03 `6:01`, Saturday 9/05 `6:00`, 9/14 13h undertime
+- holidays on 9/08 and 9/15 keep the guard's times
+- the labeled 9/15 holiday opens Adjust, and the 06:00 departure gives `11 days`
+- every HRMO anchor unchanged
+
+Results: `docs/test-results/PHASE-8-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/parse.js`: `parseRows` (session from `On duty`, a repeated day and session skipped).
+- `src/lib/dtr.js`: `isNightStart`, `shiftDate`, `nightShift`, and `computeDtr` with `row.night`.
+- `src/lib/store.js`: `adjustDay` (night rows allowed on weekends and holidays).
+- React UI: `openAdjust` in `src/App.jsx` (labeled night rows open the dialog).
 
 Deliberately not built, and why: other shift patterns (out of scope), removing grace (admin: not yet), and the pending morning-only late, daily rate, deduction, red late arrival, and T.O./leave marks (not yet amended into the spec).
+
+Conventions later phases inherit:
+- A row's session comes from its `On duty` (before 12:00 is A.M.), never from the Timetable name.
+- A night shift is a P.M. row with `Off duty` `23:59` plus the next day's A.M. row. Code that reads a day's times must check `row.night` before treating a weekend or holiday as non-working.
+- Night credit is split at midnight onto the two rows, so each half-month period counts only its own rows.
