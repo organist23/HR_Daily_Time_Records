@@ -4,7 +4,7 @@
 
 **Goal:** On the A.M. row of a night shift, a Clock In with a blank Clock Out is the departure. It shows in the A.M. Departure cell and completes the shift.
 
-**Architecture:** In `computeDtr`, when `amNight` and the A.M. punch has `in` but no `out`, use `{ ...am, in: '', out: am.in }` (with its adjusted flag moved to `out`) for display and for `nightShift`. The start row's `nightShift` call reads the next-day A.M. punch the same way. One helper, `nightEnd(p)`, used in both places. Nothing else changes.
+**Architecture:** In `parseRows`, after all rows are read: an A.M. row with a Clock In, no Clock Out, and a night start (P.M. Off duty 23:59) on the previous date in the same file has its Clock In moved to Clock Out. Done at import, so `computeDtr`, the Adjust dialog, and `adjustDay` all see the departure. (Revised after code review: the first version did this only inside `computeDtr`, so the dialog still showed 05:57 as the arrival.)
 
 **Spec:** `spec.md` US-13 (Changed 2026-11-10) and the "Early-morning punch filed as Clock In" rule.
 

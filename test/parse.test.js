@@ -29,6 +29,15 @@ describe('parseRows night shift (US-13)', () => {
     expect(find(records, '14', '2026-07-01', 'PM')).toMatchObject({ onDuty: '13:00' });
   });
 
+  // US-13 Changed 2026-11-10: the device files a departure before 06:00 under Clock In on the night A.M. row.
+  it('stores a lone Clock In on a night A.M. row as the departure', () => {
+    const { records } = parseRows(readSheetRows(fs.readFileSync('sample_data/GSO_.xls')));
+    expect(find(records, '519', '2026-10-06', 'AM')).toMatchObject({ onDuty: '01:00', in: '', out: '05:57' }); // RENATO
+    expect(find(records, '903', '2026-10-10', 'AM')).toMatchObject({ in: '', out: '05:58' }); // REYGAN
+    // A day employee's A.M. row with only a Clock In is untouched (RONIE 7/01).
+    expect(find(parseRows(hrmoRows()).records, '568', '2026-07-01', 'AM')).toMatchObject({ in: '08:00', out: '' });
+  });
+
   it('HRMO Morning and Afternoon rows keep their sessions', () => {
     const { records } = parseRows(hrmoRows());
     expect(records.filter((r) => r.session === 'AM').every((r) => r.onDuty === '08:00')).toBe(true);
