@@ -47,7 +47,7 @@ function Preview({ data, employee, onDataChange, onNotice, records }) {
   const [batch, setBatch] = useState(null); // { kind: 'print'|'pdf', name } while an office job renders
   const [adjusting, setAdjusting] = useState(null); // day of month being adjusted
 
-  const graceMinutes = settings.graceMinutes ?? 15;
+  const graceMinutes = settings.graceMinutes ?? 0;
   const holidays = data.holidays ?? NO_HOLIDAYS;
   const result = computeDtr({ punches, year, month, half, graceMinutes, holidays });
   const periodText = periodLabel(year, month, half);

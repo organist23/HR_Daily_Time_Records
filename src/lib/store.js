@@ -5,7 +5,16 @@ import { HOLIDAY_TYPES, offDayLabel, isDayKeyOf } from './dtr.js';
 const FILE = 'dtr-data.json';
 
 export function emptyData() {
-  return { version: 1, offices: {}, employees: {}, punches: {}, holidays: {}, adjustments: {} };
+  return { version: 2, offices: {}, employees: {}, punches: {}, holidays: {}, adjustments: {} };
+}
+
+// Version 1 data predates grace default 0 (US-5, 2026-11-10): every office goes to 0 once.
+// Returns true when it changed the data.
+export function migrateGrace(data) {
+  if (data.version !== 1) return false;
+  data.offices = Object.fromEntries(Object.entries(data.offices).map(([k, o]) => [k, { ...o, graceMinutes: 0 }]));
+  data.version = 2;
+  return true;
 }
 
 export function resolveOffice(data, typed) {
@@ -17,7 +26,7 @@ export function resolveOffice(data, typed) {
 
 export function mergeImport(data, office, records) {
   // Own-key check and object-literal define, so names like "__proto__" are stored as plain keys.
-  if (!Object.hasOwn(data.offices, office)) data.offices = { ...data.offices, [office]: { name: office, graceMinutes: 15 } };
+  if (!Object.hasOwn(data.offices, office)) data.offices = { ...data.offices, [office]: { name: office, graceMinutes: 0 } };
   let added = 0;
   let updated = 0;
   for (const r of records) {
@@ -194,7 +203,7 @@ export function readBackup(text) {
   }
   const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
   if (!isMap(file) || file.format !== BACKUP_FORMAT) throw new Error('Invalid backup: not a DTR Analyzer backup');
-  if (file.version !== 1 || !isMap(file.data) || file.data.version !== 1) throw new Error('Invalid backup: unsupported version');
+  if (file.version !== 1 || !isMap(file.data) || ![1, 2].includes(file.data.version)) throw new Error('Invalid backup: unsupported version');
   const d = file.data;
   for (const m of ['offices', 'employees', 'punches', 'adjustments', 'holidays']) {
     if (!isMap(d[m])) throw new Error(`Invalid backup: ${m} is missing or not a list`);
@@ -241,7 +250,7 @@ export function readBackup(text) {
   const each = (map, pick) => Object.fromEntries(Object.entries(map).map(([k, v]) => [k, pick(v)]));
   const opt = (v, key) => (v[key] === undefined ? {} : { [key]: v[key] });
   const data = {
-    version: 1,
+    version: d.version,
     offices: each(d.offices, (o) => ({ name: o.name, graceMinutes: o.graceMinutes, ...opt(o, 'inCharge'), ...opt(o, 'archived') })),
     employees: each(d.employees, (e) => ({ office: e.office, acNo: e.acNo, name: e.name, ...opt(e, 'archived') })),
     punches: each(d.punches, (p) => ({
@@ -250,5 +259,6 @@ export function readBackup(text) {
     adjustments: each(d.adjustments, (a) => ({ in: a.in, out: a.out, onDuty: a.onDuty, offDuty: a.offDuty, reason: a.reason, at: a.at })),
     holidays: each(d.holidays, (h) => ({ date: h.date, name: h.name, type: h.type })),
   };
+  migrateGrace(data);
   return { data, savedAt: String(file.savedAt ?? '') };
 }

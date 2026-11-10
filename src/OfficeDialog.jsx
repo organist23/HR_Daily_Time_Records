@@ -4,11 +4,11 @@ import useDialogKeys from './useDialogKeys.js';
 // onArchive closes this dialog first. Delete is offered only in the Archived view.
 export default function OfficeDialog({ office, settings, onSave, onCancel, onArchive }) {
   const [inCharge, setInCharge] = useState(settings.inCharge ?? '');
-  const [grace, setGrace] = useState(String(settings.graceMinutes ?? 15));
+  const [grace, setGrace] = useState(String(settings.graceMinutes ?? 0));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const first = useRef(null);
-  const dirty = inCharge !== (settings.inCharge ?? '') || grace !== String(settings.graceMinutes ?? 15);
+  const dirty = inCharge !== (settings.inCharge ?? '') || grace !== String(settings.graceMinutes ?? 0);
 
   useDialogKeys(first, onCancel, busy);
 

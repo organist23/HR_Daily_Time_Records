@@ -68,7 +68,7 @@ test('US-11 archive, restore, and delete employees and offices', async () => {
     // Unsaved edits block Archive and Delete, so they are never dropped silently.
     await od.getByLabel('Grace minutes').fill('10');
     await expect(od.getByRole('button', { name: 'Archive office' })).toBeDisabled();
-    await od.getByLabel('Grace minutes').fill('15');
+    await od.getByLabel('Grace minutes').fill('0'); // back to the saved default (grace 0 since US-5 Changed 2026-11-10)
     await od.getByRole('button', { name: 'Archive office' }).click();
     await expect(status).toContainText('Archived office HRMO1. Restore it from Archived.');
     // The group and the filter option go away, and the filter goes back to all offices.
