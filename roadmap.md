@@ -230,3 +230,18 @@ Deliberately not built, and why: scheduled or automatic backups (not in US-12), 
 Conventions later phases inherit:
 - A new field in the data must also be added to `readBackup` (both its checks and the rebuilt object), or restore drops it.
 - Untrusted files are read only in main, checked fully, and applied only after confirmation. The renderer never sends the data to apply.
+
+## Part two — LGU computation rules
+
+### Phase 7 — Grace default 0 NEXT
+
+Covers US-5 (changed 2026-11-10), with the US-2 example it changes.
+Reopens Phase 0: US-2 example at grace 0. Reopens Phase 1: US-5 grace default 15 → 0.
+
+- New offices default to grace 0
+- On first start after the update, every existing office is set to grace 0, after a dated copy of the data is saved
+- Office settings still lets the admin set grace per office
+
+**Done when:** a newly imported office shows Grace minutes `0`, HRMO shows `0` after the update, LAZARO 7/06/2026 shows 0h 14m undertime, and RONIE 7/02/2026 shows 0h 3m.
+
+Deliberately not built, and why: removing the grace setting (admin chose default 0, not removal), morning-only late, daily rate, late deduction, red late arrivals, and T.O./leave marks (pending, not yet amended into the spec).

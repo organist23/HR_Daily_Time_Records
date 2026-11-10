@@ -17,7 +17,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - **Session hours** come from the file's `On duty`/`Off duty` (HRMO: AM 08:00–12:00, PM 13:00–17:00).
 - **Displayed times** are 12h `h:mm` without AM/PM (13:02 → `1:02`), as in the reference photo.
 - **Late**: if arrival is later than on-duty + grace, late = arrival − on-duty in full minutes. Otherwise 0.
-  - Grace is set per office and defaults to 15 minutes.
+  - Grace is set per office and defaults to 0 minutes, so 8:01 is 1 minute late (LGU standard). Changed 2026-11-10: the default was 15, and every existing office was set to 0 (admin decision).
   - Evidence from HRMO (3).xls: 8:08 and 13:06 were not marked late, and 8:18 was marked 18 minutes late. So the device grace is between 9 and 17 minutes, with lateness counted from 8:00 once the grace is exceeded.
   - The CSC has no legal grace period, so the office can set it to 0.
 - **Early departure**: if departure is earlier than off-duty, early = off-duty − departure. There is no grace.
@@ -51,7 +51,7 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 **Accepts when:**
 - [ ] Arrival, departure, undertime, and days total follow the computation rules above.
 - [ ] RONIE LOUISE BERMUDEZ, 7/01/2026: AM shows `8:00` and blank departure, undertime 4h 0m (missing punch). The PM cells are blank (absence).
-- [ ] JOHN RYAN A. LAZARO, 7/08/2026 AM `8:18`: undertime 0h 18m. 7/06/2026 AM `8:08`: undertime 0 (within grace).
+- [ ] JOHN RYAN A. LAZARO, 7/08/2026 AM `8:18`: undertime 0h 18m. 7/06/2026 AM `8:08` and PM `1:06`: undertime 0h 14m at grace 0, and 0 at grace 15.
 - [ ] The days total for an employee present in full 8–12 and 1–5 for 7 days = `7 days`.
 
 **Rejects when:**
@@ -84,10 +84,12 @@ An Electron + React desktop app that imports biometric Excel exports per office,
 - [ ] A single DTR spills onto a second page.
 
 ### US-5: In-charge name per office
+Changed 2026-11-10: grace minutes default to 0, and existing offices were set to 0 (admin decision, LGU counts 8:01 as late).
 **As** admin, **I want** to set a default in-charge name per office and change it before printing, **so that** the VERIFIED signature line is correct when the person in charge changes.
 
 **Accepts when:**
-- [ ] Each office has an editable in-charge name and grace minutes (default 15).
+- [ ] Each office has an editable in-charge name and grace minutes (default 0).
+- [ ] After the update, every existing office shows grace minutes 0, whatever it was before, and a copy of the data is saved first.
 - [ ] The preview shows the office's in-charge name above "In Charge".
 - [ ] The admin can override the in-charge name for one print without changing the office default.
 
