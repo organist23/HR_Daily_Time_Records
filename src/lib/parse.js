@@ -42,6 +42,7 @@ export function parseRows(rows) {
   if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
 
   const records = [];
+  const seen = new Set(); // acNo|date|session: a third timetable must not overwrite the first P.M. row
   let skipped = 0;
   for (const row of rows.slice(1)) {
     if (row.every((c) => String(c).trim() === '')) continue;
@@ -58,8 +59,12 @@ export function parseRows(rows) {
       in: parseTime(get('Clock In'), true),
       out: parseTime(get('Clock Out'), true),
     };
-    if (!rec.acNo || Object.values(rec).some((v) => v === null || v === undefined)) skipped++;
-    else records.push(rec);
+    const key = `${rec.acNo}|${rec.date}|${rec.session}`;
+    if (!rec.acNo || Object.values(rec).some((v) => v === null || v === undefined) || seen.has(key)) skipped++;
+    else {
+      seen.add(key);
+      records.push(rec);
+    }
   }
   return { records, skipped };
 }
