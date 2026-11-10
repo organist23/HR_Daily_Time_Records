@@ -43,6 +43,12 @@ export const shiftDate = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n
 // US-13: a P.M. row ending at 23:59 starts a night shift that ends on the next day's A.M. row.
 export const isNightStart = (p) => p?.session === 'PM' && p.offDuty === '23:59';
 
+// The A.M. row of a night shift only holds the departure. The device files a punch before 06:00 under
+// Clock In (GSO_.xls 10/06 05:57), so a lone Clock In there is the departure.
+const nightEnd = (p) => (p?.in && !p.out
+  ? { ...p, in: '', out: p.in, adjusted: p.adjusted && { in: false, out: p.adjusted.in } }
+  : p);
+
 // One night shift, credited straight through midnight: start row up to 24:00, end row from 00:00.
 // Missing arrival or departure: the whole shift is undertime on the start row.
 function nightShift(start, end, graceMinutes) {
@@ -108,12 +114,12 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
     const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
-      const am = byKey.get(`${date}|AM`);
       const pm = byKey.get(`${date}|PM`);
       // A night shift starts on this P.M. row, or ended on this A.M. row (started the day before).
       const prevPm = byKey.get(`${shiftDate(date, -1)}|PM`);
-      const nextAm = byKey.get(`${shiftDate(date, 1)}|AM`);
+      const nextAm = isNightStart(pm) ? nightEnd(byKey.get(`${shiftDate(date, 1)}|AM`)) : undefined;
       const amNight = isNightStart(prevPm);
+      const am = amNight ? nightEnd(byKey.get(`${date}|AM`)) : byKey.get(`${date}|AM`);
       const pmNight = isNightStart(pm);
       if (amNight || pmNight) row.night = true;
       const hasTimes = (p) => Boolean(p && (p.in || p.out));

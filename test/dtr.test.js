@@ -307,3 +307,30 @@ describe('night shift (US-13)', () => {
     expect(officialHours(efren, 2026, 9)).toBe('1:00-6:00, 5:00-11:59');
   });
 });
+
+// US-13 Changed 2026-11-10: the device files a departure before 06:00 under Clock In on the night A.M. row.
+// Hand-derived from sample_data/GSO_.xls raw rows, grace 0.
+describe('night shift: lone Clock In on the A.M. row is the departure', () => {
+  const gso = parseRows(readSheetRows(fs.readFileSync('sample_data/GSO_.xls'))).records;
+  const oct = (acNo, dates) => computeDtr({
+    punches: gso.filter((p) => p.acNo === acNo && dates.includes(p.date)), year: 2026, month: 10, half: 'first', graceMinutes: 0,
+  });
+
+  it('RENATO 10/05 16:04 → 10/06 Clock In 05:57: 420 + 357 = 777, 3 min early', () => {
+    const d = oct('519', ['2026-10-05', '2026-10-06']);
+    expect(d.credited).toBe(777);
+    expect(d.rows[4]).toMatchObject({ pmIn: '4:04', undertime: 0 });
+    expect(d.rows[5]).toMatchObject({ amIn: '', amOut: '5:57', undertime: 3 });
+  });
+
+  it('REYGAN 10/09 17:06 → 10/10 Clock In 05:58: 414 + 358 = 772', () => {
+    const d = oct('903', ['2026-10-09', '2026-10-10']);
+    expect(d.credited).toBe(772);
+    expect([d.rows[8].undertime, d.rows[9].undertime]).toEqual([6, 2]);
+  });
+
+  it('a day employee A.M. row with only a Clock In is still a missing punch', () => {
+    const d = july('568'); // RONIE 7/01 A.M. in 08:00, no departure
+    expect(d.rows[0]).toMatchObject({ amIn: '8:00', amOut: '', undertime: 240 });
+  });
+});
