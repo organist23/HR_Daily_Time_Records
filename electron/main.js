@@ -11,7 +11,9 @@ import { adjustedDayCount } from '../src/lib/dtr.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The single-instance lock is per userData folder, so it guards exactly this data file.
-if (process.env.DTR_DATA_DIR) app.setPath('userData', process.env.DTR_DATA_DIR);
+// Pinned to the folder the app has always used, so the installed build (productName "Employees DTR Analyzer")
+// opens the same %APPDATA%\employees-dtr-analyzer data instead of a new empty one.
+app.setPath('userData', process.env.DTR_DATA_DIR || path.join(app.getPath('appData'), 'employees-dtr-analyzer'));
 const dataDir = app.getPath('userData');
 const picked = new Set(); // only files the admin chose in the OS dialog may be read
 let data = null;
