@@ -11,7 +11,7 @@ const july = (acNo, half = 'first', graceMinutes = 15) =>
 describe('computeDtr', () => {
   it('missing punch = 4h undertime, absent session = blank', () => {
     const r = july('568').rows[0]; // RONIE 7/01: AM 08:00 in only, PM absent
-    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240, label: '', adjusted: [] });
+    expect(r).toEqual({ day: 1, amIn: '8:00', amOut: '', pmIn: '', pmOut: '', undertime: 240, label: '', adjusted: [], late: [] });
   });
 
   it('late beyond grace counts from on-duty', () => {
@@ -62,7 +62,7 @@ describe('computeDtr', () => {
   it('days outside the period are blank', () => {
     const d = july('14', 'second');
     expect(d.rows).toHaveLength(31);
-    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] });
+    expect(d.rows[0]).toEqual({ day: 1, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [], late: [] });
     expect(d.credited).toBe(0);
   });
 
@@ -332,5 +332,39 @@ describe('night shift: lone Clock In on the A.M. row is the departure', () => {
   it('a day employee A.M. row with only a Clock In is still a missing punch', () => {
     const d = july('568'); // RONIE 7/01 A.M. in 08:00, no departure
     expect(d.rows[0]).toMatchObject({ amIn: '8:00', amOut: '', undertime: 240 });
+  });
+});
+
+// US-15 red late arrivals. Hand-derived from HRMO (3).xls (on-duty 08:00 and 13:00) and NIGHT_shift.xls.
+describe('late arrivals (US-15)', () => {
+  it('LAZARO 7/08 08:18 is late at grace 0 and 15', () => {
+    expect(july('611', 'first', 0).rows[7].late).toEqual(['amIn']);
+    expect(july('611', 'first', 15).rows[7].late).toEqual(['amIn']);
+  });
+
+  it('LAZARO 7/06 08:08 and 13:06 are late at grace 0, not at grace 15', () => {
+    expect(july('611', 'first', 0).rows[5].late).toEqual(['amIn', 'pmIn']);
+    expect(july('611', 'first', 15).rows[5].late).toEqual([]);
+  });
+
+  it('an arrival at on-duty is not late (RONIE 7/01 08:00)', () => {
+    expect(july('568', 'first', 0).rows[0].late).toEqual([]);
+  });
+
+  it('a late arrival with no departure is still late', () => {
+    const p = { acNo: '1', name: 'X', date: '2026-07-01', session: 'AM', onDuty: '08:00', offDuty: '12:00', in: '08:30', out: '' };
+    expect(computeDtr({ punches: [p], year: 2026, month: 7, half: 'first', graceMinutes: 0 }).rows[0].late).toEqual(['amIn']);
+  });
+
+  it('night-shift arrivals are never marked (EFREN 9/02 17:12 is 12 min late)', () => {
+    const efren = parseRows(readSheetRows(fs.readFileSync('sample_data/NIGHT_shift.xls'))).records;
+    const d = computeDtr({ punches: efren, year: 2026, month: 9, half: 'first', graceMinutes: 0 });
+    expect(d.rows[1].pmIn).toBe('5:12');
+    expect(d.rows.flatMap((r) => r.late)).toEqual([]);
+  });
+
+  it('marking late changes no computed value', () => {
+    const d = july('611', 'first', 0);
+    expect([d.rows[5].undertime, d.rows[7].undertime]).toEqual([14, 18]);
   });
 });

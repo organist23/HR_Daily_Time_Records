@@ -352,3 +352,32 @@ Deliberately not built, and why: saving the toggle to the data file (admin chose
 Conventions later phases inherit:
 - Every `DtrForm` render passes `showTotals`. Session-wide display settings live in `App` state, since `Preview` remounts per employee.
 - E2E specs that read undertime or totals call `showTotals(page)` from `test/e2e/helpers.js` after the first employee opens in each launch.
+
+## Part five — Late marks
+
+### Phase 11 — Red late arrivals ✅ DONE (merged `0f0f504`, 2026-11-11)
+
+Covers US-15.
+
+- Day-shift arrivals with computed late above 0 show in red
+- Same red on screen, print, PDF, and office batches, whether totals are shown or hidden
+
+**Done when:** JOHN RYAN A. LAZARO July 2026 shows 7/08 `8:18` red on screen and in an exported PDF, 7/06 `8:08` and `1:06` red at grace 0 and black at grace 15, departures and EFREN's night-shift times stay black, and every computed value is unchanged. — **Verified** on 2026-11-11 with Playwright `_electron` and Vitest: 147/147 unit, 22/22 E2E (full run). Checked:
+- LAZARO 7/08 `8:18`, 7/06 `8:08` and `1:06`, 7/03 `8:08` (no departure) red on screen, under print media, with totals hidden and shown
+- the exported PDF carries the red (`.8667 0 0 rg`), RELITA's has none, and Print office batch cells are red
+- an adjusted late arrival is red and keeps its tint
+- grace 15 turns 7/06 black and keeps 7/08 red
+- departures, RONIE `8:00`, and EFREN's night-shift times stay black
+
+Results: `docs/test-results/PHASE-11-TEST-RESULTS.md`.
+
+Shipped as:
+- `src/lib/dtr.js`: `isLate` (shared by `session` and `nightShift`), and `computeDtr` with `row.late`.
+- `src/DtrForm.jsx`: `late` class on arrival cells.
+- `src/dtr-form.css`: `.dtr-form .grid td.late` red text.
+
+Deliberately not built, and why: red early departures and red night-shift arrivals (admin: arrivals on day shift only), and the pending morning-only late, daily rate, deduction, and T.O./leave marks (not yet amended into the spec).
+
+Conventions later phases inherit:
+- Late is `isLate` (arrival − on-duty > grace, arrival alone). Undertime and the red mark both use it.
+- Every `computeDtr` row has `late: []`. Whole-row test expectations include it.

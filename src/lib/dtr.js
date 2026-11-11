@@ -25,13 +25,15 @@ export function periodLabel(year, month, half) {
   return `For the period of ${name} ${from}-${to}, ${year}`;
 }
 
+// US-15: arrival later than on-duty + grace. Set from the arrival alone, so a late arrival with no departure counts.
+const isLate = (p, graceMinutes) => Boolean(p?.in) && minutes(p.in) - minutes(p.onDuty) > graceMinutes;
+
 // Returns { undertime, credited } in minutes for one Morning/Afternoon session.
 function session(p, graceMinutes) {
   if (!p || (!p.in && !p.out)) return { undertime: 0, credited: 0 }; // absent: leave, not undertime
   const length = minutes(p.offDuty) - minutes(p.onDuty);
   if (!p.in || !p.out) return { undertime: length, credited: 0 };
-  const lateBy = minutes(p.in) - minutes(p.onDuty);
-  const late = lateBy > graceMinutes ? lateBy : 0;
+  const late = isLate(p, graceMinutes) ? minutes(p.in) - minutes(p.onDuty) : 0;
   const early = Math.max(0, minutes(p.offDuty) - minutes(p.out));
   const undertime = Math.min(length, late + early);
   return { undertime, credited: length - undertime };
@@ -51,8 +53,7 @@ function nightShift(start, end, graceMinutes) {
   const endLen = end ? minutes(end.offDuty) : 0;
   if (!start.in && !end?.out) return { start: zero, end: zero }; // absent
   if (!start.in || !end?.out) return { start: { undertime: startLen + endLen, credited: 0 }, end: zero };
-  const lateBy = minutes(start.in) - minutes(start.onDuty);
-  const late = Math.min(startLen, lateBy > graceMinutes ? lateBy : 0);
+  const late = Math.min(startLen, isLate(start, graceMinutes) ? minutes(start.in) - minutes(start.onDuty) : 0);
   const early = Math.min(endLen, Math.max(0, minutes(end.offDuty) - minutes(end.out)));
   return {
     start: { undertime: late, credited: startLen - late },
@@ -105,7 +106,7 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
   let credited = 0;
   const rows = [];
   for (let day = 1; day <= 31; day++) {
-    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [] };
+    const row = { day, amIn: '', amOut: '', pmIn: '', pmOut: '', undertime: 0, label: '', adjusted: [], late: [] };
     if (day >= from && day <= to) {
       const date = prefix + String(day).padStart(2, '0');
       const am = byKey.get(`${date}|AM`);
@@ -127,6 +128,9 @@ export function computeDtr({ punches, year, month, half, graceMinutes, holidays 
           pmIn: formatTime(pm?.in), pmOut: formatTime(pm?.out),
           adjusted: [[am, 'in', 'amIn'], [am, 'out', 'amOut'], [pm, 'in', 'pmIn'], [pm, 'out', 'pmOut']]
             .filter(([p, f]) => p?.adjusted?.[f]).map(([, , cell]) => cell),
+          // Night-shift arrivals stay unmarked (admin decision 2026-11-11).
+          late: [[am, amNight, 'amIn'], [pm, pmNight, 'pmIn']]
+            .filter(([p, night]) => !night && isLate(p, graceMinutes)).map(([, , cell]) => cell),
         });
         const amPart = amNight ? nightShift(prevPm, am, graceMinutes).end : session(am, graceMinutes);
         const pmPart = pmNight ? nightShift(pm, nextAm, graceMinutes).start : session(pm, graceMinutes);
