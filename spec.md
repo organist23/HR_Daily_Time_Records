@@ -241,6 +241,23 @@ Added 2026-11-10 (admin request).
 - [ ] Hiding changes any computed value.
 - [ ] Arrival or departure times are hidden.
 
+### US-15: Red late arrivals
+Added 2026-11-11 (admin request).
+**As** admin, **I want** late arrival times shown in red, **so that** I can see tardiness at a glance on screen and on paper.
+
+**Accepts when:**
+- [ ] A day-shift A.M. or P.M. Arrival is red when its computed late is above 0, using the office grace.
+- [ ] Red shows on screen, in Print, in Export PDF, and in Print office and Export office PDF.
+- [ ] Red shows whether undertime and total are shown or hidden.
+- [ ] An adjusted arrival that is late is red and keeps its yellow tint on screen.
+- [ ] JOHN RYAN A. LAZARO July 2026: 7/08 A.M. `8:18` is red. 7/06 `8:08` and `1:06` are red at grace 0 and black at grace 15.
+
+**Rejects when:**
+- [ ] A departure is red.
+- [ ] An arrival that is not late is red (`8:00`, or `8:10` at grace 15).
+- [ ] A night-shift arrival or departure is red. Night-shift times stay black.
+- [ ] Red changes any computed value.
+
 ## Out of Scope
 - Shift patterns other than day (Morning/Afternoon) and night (P.M. start ending on the next A.M.). Changed 2026-11-10: night shift moved into scope (US-13).
 - Leave management (leave credits, leave applications). Absences are shown blank, not converted to leave.
