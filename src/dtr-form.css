@@ -60,6 +60,8 @@
 .dtr-form .day-btn:hover { text-decoration: underline; }
 .dtr-form .day-btn:focus-visible { outline: 2px solid #1f5fbf; }
 @media print { .dtr-form .grid td.adjusted { background: none; } }
+/* US-15: late arrivals, red on screen and on paper (text color prints without background graphics). */
+.dtr-form .grid td.late { color: #d00; }
 .dtr-form .grid .label-cell { font-weight: bold; letter-spacing: 0.15em; font-size: 9pt; }
 .dtr-form .grid .total-line { display: flex; justify-content: space-between; align-items: center; padding: 0 4pt; font-size: 9pt; }
 .dtr-form .grid .total-line .days { font-weight: bold; font-size: 10pt; }

@@ -352,3 +352,16 @@ Deliberately not built, and why: saving the toggle to the data file (admin chose
 Conventions later phases inherit:
 - Every `DtrForm` render passes `showTotals`. Session-wide display settings live in `App` state, since `Preview` remounts per employee.
 - E2E specs that read undertime or totals call `showTotals(page)` from `test/e2e/helpers.js` after the first employee opens in each launch.
+
+## Part five — Late marks
+
+### Phase 11 — Red late arrivals — NEXT
+
+Covers US-15.
+
+- Day-shift arrivals with computed late above 0 show in red
+- Same red on screen, print, PDF, and office batches, whether totals are shown or hidden
+
+**Done when:** JOHN RYAN A. LAZARO July 2026 shows 7/08 `8:18` red on screen and in an exported PDF, 7/06 `8:08` and `1:06` red at grace 0 and black at grace 15, departures and EFREN's night-shift times stay black, and every computed value is unchanged.
+
+Deliberately not built, and why: red early departures and red night-shift arrivals (admin: arrivals on day shift only), and the pending morning-only late, daily rate, deduction, and T.O./leave marks (not yet amended into the spec).

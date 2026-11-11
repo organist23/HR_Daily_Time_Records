@@ -8,7 +8,7 @@ const mins = (min) => (min ? String(min % 60) : '');
 // showTotals false (US-14) blanks the undertime cells and the Total row values, keeping the columns and rows.
 export default function DtrForm({ name, periodText, officialHours, half, result, inCharge, onDayClick, dayName, showTotals = false }) {
   const shown = (text) => (showTotals ? text : '');
-  const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted'].filter(Boolean).join(' ') || undefined;
+  const cls = (r, key, extra = '') => [extra, r.adjusted.includes(key) && 'adjusted', r.late.includes(key) && 'late'].filter(Boolean).join(' ') || undefined;
   // The form keeps the template's printed rows (16-31 even in a 30-day month).
   // computeDtr already blanks days outside the period, so only the half is chosen here.
   const rows = result.rows.filter((r) => (half === 'first' ? r.day <= 15 : half === 'second' ? r.day >= 16 : true));
