@@ -246,7 +246,7 @@ Added 2026-11-11 (admin request).
 **As** admin, **I want** late arrival times shown in red, **so that** I can see tardiness at a glance on screen and on paper.
 
 **Accepts when:**
-- [ ] A day-shift A.M. or P.M. Arrival is red when its computed late is above 0, using the office grace.
+- [ ] A day-shift A.M. or P.M. Arrival is red when it is later than on-duty + office grace, with or without a departure.
 - [ ] Red shows on screen, in Print, in Export PDF, and in Print office and Export office PDF.
 - [ ] Red shows whether undertime and total are shown or hidden.
 - [ ] An adjusted arrival that is late is red and keeps its yellow tint on screen.

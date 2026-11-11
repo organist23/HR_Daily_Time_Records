@@ -43,6 +43,15 @@ Full E2E run: yes, computeDtr and DtrForm are in the Shipped as of several phase
 
 `test/dtr.test.js`: two whole-row `toEqual` checks now include `late: []`. No value changed.
 
+## Code review fixes
+
+- `session` and `nightShift` use `isLate`, so the red mark and the undertime share one late rule.
+- US-15 wording now says "later than on-duty + office grace, with or without a departure", matching the code (7/03 `8:08` with no departure is red).
+- E2E color checks use retrying `toHaveCSS`. The red value comes from one `RED` constant. Full run repeated: 147/147 unit, 22/22 E2E. CSS-removal mutation still goes red.
+- Not fixed, outside this phase: a night A.M. row whose night-start P.M. record is not imported keeps a pre-06:00 punch as its Arrival (Phase 9 parser only moves it when the start is in the same file). That arrival shows red. Needs its own fix through the `feature-workflow` Gate.
+- Skipped: the PDF operator regex. A changed encoding fails the LAZARO `> 0` check, so the RELITA zero check cannot pass silently.
+- `/ponytail-review` not installed in this session. `/security-review` not run: the diff touches no trust boundary.
+
 ## DONE phases
 
 None skipped. Full run.

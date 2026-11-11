@@ -25,20 +25,19 @@ export function periodLabel(year, month, half) {
   return `For the period of ${name} ${from}-${to}, ${year}`;
 }
 
+// US-15: arrival later than on-duty + grace. Set from the arrival alone, so a late arrival with no departure counts.
+const isLate = (p, graceMinutes) => Boolean(p?.in) && minutes(p.in) - minutes(p.onDuty) > graceMinutes;
+
 // Returns { undertime, credited } in minutes for one Morning/Afternoon session.
 function session(p, graceMinutes) {
   if (!p || (!p.in && !p.out)) return { undertime: 0, credited: 0 }; // absent: leave, not undertime
   const length = minutes(p.offDuty) - minutes(p.onDuty);
   if (!p.in || !p.out) return { undertime: length, credited: 0 };
-  const lateBy = minutes(p.in) - minutes(p.onDuty);
-  const late = lateBy > graceMinutes ? lateBy : 0;
+  const late = isLate(p, graceMinutes) ? minutes(p.in) - minutes(p.onDuty) : 0;
   const early = Math.max(0, minutes(p.offDuty) - minutes(p.out));
   const undertime = Math.min(length, late + early);
   return { undertime, credited: length - undertime };
 }
-
-// US-15: arrival later than on-duty + grace. Set from the arrival alone, so a late arrival with no departure counts.
-const isLate = (p, graceMinutes) => Boolean(p?.in) && minutes(p.in) - minutes(p.onDuty) > graceMinutes;
 
 // ISO date plus n days.
 export const shiftDate = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
@@ -54,8 +53,7 @@ function nightShift(start, end, graceMinutes) {
   const endLen = end ? minutes(end.offDuty) : 0;
   if (!start.in && !end?.out) return { start: zero, end: zero }; // absent
   if (!start.in || !end?.out) return { start: { undertime: startLen + endLen, credited: 0 }, end: zero };
-  const lateBy = minutes(start.in) - minutes(start.onDuty);
-  const late = Math.min(startLen, lateBy > graceMinutes ? lateBy : 0);
+  const late = Math.min(startLen, isLate(start, graceMinutes) ? minutes(start.in) - minutes(start.onDuty) : 0);
   const early = Math.min(endLen, Math.max(0, minutes(end.offDuty) - minutes(end.out)));
   return {
     start: { undertime: late, credited: startLen - late },

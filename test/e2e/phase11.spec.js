@@ -15,8 +15,7 @@ const BLACK = 'rgb(0, 0, 0)';
 const NIGHT = path.resolve('sample_data/NIGHT_shift.xls');
 const form = (page) => page.locator('.main-page .dtr-form');
 const cell = (page, day, i) => form(page).locator(`tr[data-day="${day}"] td`).nth(i); // 1 amIn, 2 amOut, 3 pmIn, 4 pmOut
-const color = (loc) => loc.evaluate((e) => getComputedStyle(e).color);
-const redCells = (page) => form(page).locator('td').evaluateAll((tds) => tds.filter((e) => getComputedStyle(e).color === 'rgb(221, 0, 0)').length);
+const redCells = (page) => form(page).locator('td').evaluateAll((tds, red) => tds.filter((e) => getComputedStyle(e).color === red).length, RED);
 
 // Red fill operators in the PDF page streams (Chromium writes them Flate-compressed).
 // #d00 = 221/255 = 0.86667, which Chromium writes as `.8667 0 0 rg`.
@@ -40,16 +39,16 @@ const mockSave = (app, filePath) => app.evaluate(({ dialog }, p) => {
 
 async function expectLazaroGrace0(page) {
   await expect(cell(page, 8, 1)).toHaveText('8:18');
-  expect(await color(cell(page, 8, 1))).toBe(RED);
+  await expect(cell(page, 8, 1)).toHaveCSS('color', RED);
   await expect(cell(page, 6, 1)).toHaveText('8:08');
-  expect(await color(cell(page, 6, 1))).toBe(RED);
+  await expect(cell(page, 6, 1)).toHaveCSS('color', RED);
   await expect(cell(page, 6, 3)).toHaveText('1:06');
-  expect(await color(cell(page, 6, 3))).toBe(RED);
+  await expect(cell(page, 6, 3)).toHaveCSS('color', RED);
   await expect(cell(page, 3, 1)).toHaveText('8:08');
-  expect(await color(cell(page, 3, 1))).toBe(RED);
+  await expect(cell(page, 3, 1)).toHaveCSS('color', RED);
   for (const i of [2, 4]) { // departures stay black
-    expect(await color(cell(page, 6, i))).toBe(BLACK);
-    expect(await color(cell(page, 8, i))).toBe(BLACK);
+    await expect(cell(page, 6, i)).toHaveCSS('color', BLACK);
+    await expect(cell(page, 8, i)).toHaveCSS('color', BLACK);
   }
 }
 
@@ -63,7 +62,7 @@ test('US-15 late day-shift arrivals are red on screen, print, and PDF', async ()
     await page.getByRole('button', { name: /RONIE LOUISE BERMUDEZ/ }).click();
     await page.getByRole('radio', { name: '1–15' }).check();
     await expect(cell(page, 1, 1)).toHaveText('8:00');
-    expect(await color(cell(page, 1, 1))).toBe(BLACK);
+    await expect(cell(page, 1, 1)).toHaveCSS('color', BLACK);
 
     await page.getByRole('button', { name: /JOHN RYAN A\. LAZARO/ }).click();
     await page.getByRole('radio', { name: '1–15' }).check();
@@ -95,21 +94,21 @@ test('US-15 late day-shift arrivals are red on screen, print, and PDF', async ()
     expect(pdfRedOps(path.join(out, 'relita.pdf'))).toBe(0);
 
     // Print office: the batch pages carry the red too (system print dialog mocked).
-    await app.evaluate(({ BrowserWindow }) => {
+    await app.evaluate(({ BrowserWindow }, red) => {
       const wc = BrowserWindow.getAllWindows()[0].webContents;
       wc.print = async (opts, cb) => {
         globalThis.redInBatch = await wc.executeJavaScript(
-          `[...document.querySelectorAll('.print-batch td')].filter((e) => getComputedStyle(e).color === 'rgb(221, 0, 0)').map((e) => e.textContent)`);
+          `[...document.querySelectorAll('.print-batch td')].filter((e) => getComputedStyle(e).color === '${red}').map((e) => e.textContent)`);
         cb(true, '');
       };
-    });
+    }, RED);
     await page.getByRole('button', { name: 'Print office' }).click();
     await expect.poll(() => app.evaluate(() => globalThis.redInBatch)).toEqual(expect.arrayContaining(['8:18', '8:08', '1:06']));
 
     // An adjusted late arrival is red and keeps its tint.
     await page.getByRole('button', { name: /JOHN RYAN A\. LAZARO/ }).click();
     await page.getByRole('radio', { name: '1–15' }).check();
-    expect(await color(cell(page, 1, 1))).toBe(BLACK);
+    await expect(cell(page, 1, 1)).toHaveCSS('color', BLACK);
     await page.getByRole('button', { name: 'Adjust July 1, 2026' }).click();
     const dlg = page.getByRole('dialog', { name: 'Adjust time — July 1, 2026' });
     await dlg.getByLabel('A.M. arrival').fill('08:30');
@@ -118,7 +117,7 @@ test('US-15 late day-shift arrivals are red on screen, print, and PDF', async ()
     await expect(dlg).toHaveCount(0);
     await expect(cell(page, 1, 1)).toHaveText('8:30');
     await expect(cell(page, 1, 1)).toHaveClass(/adjusted/);
-    expect(await color(cell(page, 1, 1))).toBe(RED);
+    await expect(cell(page, 1, 1)).toHaveCSS('color', RED);
     expect(await cell(page, 1, 1).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 241, 184)');
 
     // Grace 15: 7/06 arrivals are within it, 7/08 is still late.
@@ -128,9 +127,9 @@ test('US-15 late day-shift arrivals are red on screen, print, and PDF', async ()
     await od.getByRole('button', { name: 'Save' }).click();
     await expect(od).toHaveCount(0);
     await expect(cell(page, 6, 6)).toHaveText(''); // undertime recomputed
-    expect(await color(cell(page, 6, 1))).toBe(BLACK);
-    expect(await color(cell(page, 6, 3))).toBe(BLACK);
-    expect(await color(cell(page, 8, 1))).toBe(RED);
+    await expect(cell(page, 6, 1)).toHaveCSS('color', BLACK);
+    await expect(cell(page, 6, 3)).toHaveCSS('color', BLACK);
+    await expect(cell(page, 8, 1)).toHaveCSS('color', RED);
 
     // Night shift: EFREN's 9/02 5:12 arrival is 12 min late but stays black, like every night cell.
     const nd = await importFiles(app, page, [NIGHT]);

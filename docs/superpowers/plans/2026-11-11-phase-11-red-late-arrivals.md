@@ -5,7 +5,7 @@
 **Goal:** Day-shift A.M. and P.M. arrivals later than on-duty + office grace show in red on screen, print, PDF, and office batches.
 
 **Architecture:**
-- `computeDtr` adds `row.late`, a list of the arrival cells (`amIn`, `pmIn`) that are late. Late = arrival − on-duty > grace, the same test `session` uses. It is set from the arrival alone, so a late arrival with no departure is still red. Night-shift sessions never add to it. Undertime math is unchanged.
+- `computeDtr` adds `row.late`, a list of the arrival cells (`amIn`, `pmIn`) that are late. Late = arrival − on-duty > grace (`isLate`, which `session` and `nightShift` also use). It is set from the arrival alone, so a late arrival with no departure is still red. Night-shift sessions never add to it. Undertime math is unchanged.
 - `DtrForm`'s `cls` adds `late` when `r.late` includes the cell, next to `adjusted`.
 - `dtr-form.css`: `.dtr-form .grid td.late { color: #d00; }`. Text color prints without `printBackground`, so no print rule is needed. The print rule that clears the `adjusted` tint does not touch color.
 - No change to the store, IPC, saved data, or `showTotals`.
